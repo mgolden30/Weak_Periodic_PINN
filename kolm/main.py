@@ -3,7 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.gridspec import GridSpec
-from lib.pinn import PINN
+#from lib.pinn import PINN
+from lib.weak_pinn import Weak_PINN
 from lib.network import Network
 from lib.optimizer import L_BFGS_B
 import tensorflow as tf
@@ -23,11 +24,11 @@ if __name__ == '__main__':
     """
 
     #number of points to train/test on
-    num_train =   100 #randomly sample this many points for training
-    num_test  =    64 #make a grid for testing with this many points
-    num_epochs=  1000 # Adjust the number of epochs as needed
-    lr = 1e-2 #learning rate
-
+    num_train =     8*8*8 #randomly sample this many points for training
+    num_test  =    32 #make a grid for testing with this many points
+    num_epochs=   256 # Adjust the number of epochs as needed
+    lr = 1e-3 #learning rate
+    p = 4 #number of points for Gaussian quadrature
 
     # kinematic viscosity of the fluid flow
     nu =  1.0 / 40
@@ -37,7 +38,7 @@ if __name__ == '__main__':
     network.summary()
 
     # build a PINN model
-    pinn = PINN(network, nu).build()
+    pinn = Weak_PINN(network, nu, p).build()
 
     seed = 32
     tf.random.set_seed(seed)  # Set seed for TensorFlow
@@ -52,10 +53,6 @@ if __name__ == '__main__':
 
     #evaluate the training data just to make sure the network is set up correctly
     output = network.predict( z_train )
-
-    # train the model using L-BFGS-B algorithm
-    #lbfgs = L_BFGS_B(model=pinn, x_train=z_train, y_train=[e_train] )
-    #lbfgs.fit()
 
     # Assuming you have your training data available in z_train and e_train
 
@@ -83,7 +80,7 @@ if __name__ == '__main__':
     y_flat = np.linspace(0, 2*np.pi, num_test)
     t_flat = np.linspace(0, 2*np.pi, num_test)
     
-    x, y, t = np.meshgrid(x_flat, y_flat, t_flat)
+    y, x, t = np.meshgrid(x_flat, y_flat, t_flat)
     z_test  = np.stack([x.flatten(), y.flatten(), t.flatten()], axis=-1)
     
     f = network.predict( z_test, batch_size=num_test )
@@ -96,17 +93,31 @@ if __name__ == '__main__':
     # Assuming w is your rank 3 tensor with shape (num_x, num_y, num_t)
     # num_x, num_y, num_t are the dimensions along x, y, and t respectively
 
+    x2, y2 = np.meshgrid(x_flat, y_flat)
+
 
     # Create the directory if it doesn't exist
     for i in range(num_test):
         print(i)
         plt.clf()
-        plt.imshow(w[:, :, i], cmap='bwr')
+
+         # Define the extent
+        extent = [y_flat.min(), y_flat.max(), x_flat.min(), x_flat.max()]
+        # Plot the image with extent information
+        plt.imshow( w[:, :, i], cmap='bwr', extent=extent)
+
+        # Plot the velocity vector field (u, v)
+        mag = np.sqrt( u**2 + v**2)
+        u = u/mag
+        v = v/mag
+
+        plt.quiver(x2, y2, np.transpose(u[:, :, i]), np.transpose(v[:, :, i]), scale=0.01, color='black', alpha=0.5)
+
         plt.colorbar(label='w')
         plt.clim(-1,1)
         plt.title(f'Time Step {i}')
-        plt.xlabel('y')
-        plt.ylabel('x')
+        plt.xlabel('x')
+        plt.ylabel('y')
         
         # Save the figure as an image
         plt.savefig( '%s/frame_%04d.png' % (output_directory, i) )

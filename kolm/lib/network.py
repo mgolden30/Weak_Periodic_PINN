@@ -1,5 +1,11 @@
 import tensorflow as tf
-from .layer import PeriodicLayer
+from .layer import PeriodicLayer, ExtraVariableLayer
+
+
+#for hidden layer
+def gaussian_activation(x):
+    return tf.exp(-tf.square(x))
+
 
 class Network:
     """
@@ -7,7 +13,7 @@ class Network:
     """
 
     @classmethod
-    def build(cls, num_inputs=3, layers=[32, 512], activation='tanh', num_outputs=3):
+    def build(cls, num_inputs=3, layers=[1024], activation=gaussian_activation, num_outputs=3):
         """
         Build a PINN model for Burgers' equation with input shape (t, x) and output shape u(t, x).
 
@@ -33,8 +39,12 @@ class Network:
         for layer in layers:
             x = tf.keras.layers.Dense(layer, activation=activation,
                 kernel_initializer='he_normal')(x)
+            
         # output layer
         outputs = tf.keras.layers.Dense(num_outputs,
             kernel_initializer='he_normal')(x)
+
+        #append an extra variable (period T) to output
+        outputs = ExtraVariableLayer()(outputs)
 
         return tf.keras.models.Model(inputs=inputs, outputs=outputs)

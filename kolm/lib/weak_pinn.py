@@ -1,5 +1,4 @@
 import tensorflow as tf
-from .layer import GradientLayer
 
 import numpy as np
 
@@ -29,11 +28,8 @@ class Weak_PINN():
         self.points, self.weights = np.polynomial.legendre.leggauss(self.p)
         self.points  = np.array(self.points, dtype='float32')
         self.weights = np.array(self.weights, dtype='float32')
-    
-        #Weak form parameters
-        self.n = 2 #power (1-x^2)^n for weak form
 
-        H = np.pi/4.0
+        H = 2*np.pi/8
         self.H = np.array( [H, H, H ], dtype='float32') #sidelengths of boxes for weak formulation
 
 
@@ -46,11 +42,9 @@ class Weak_PINN():
         Returns:
             PINN model for Kolmogorov flow with
                 input: [z = (x,y,t) ],
+                network_output: (w,u,v,T)
                 output: [ e1,e2,e3] the three equations of the velocity-vorticity formulation
         """
-
-        #add a trainable period T for the periodic solution
-        self.T = tf.Variable( 20.0, trainable=True)
 
         # equation input: z = (x,y,t)
         # these will be at the center of sampled domains
@@ -82,26 +76,27 @@ class Weak_PINN():
         f = self.network(zs2) 
 
         p = self.p
-        f = tf.reshape( f, [p,p,p,-1,3] )
+        f = tf.reshape( f, [p,p,p,-1,4] )
 
         #pull out the hydrodynamic fields
         w = f[...,0]
         u = f[...,1]
         v = f[...,2]
-        
+        T = f[...,3]
+
         #compute the forcing. For Kolmogorov we will use forcing = 4*cos(4*y)
-        forcing = 4 * tf.cos( 4 * zs[...,1] )
+        forcing = 4 * tf.sin( 4 * zs[...,1] )
 
         # rescalings for derivatives based on affine transformation to canonical [-1,1]
         rx = 2.0/self.H[0]
         ry = 2.0/self.H[1]
         rt = 2.0/self.H[2]
-        rt2 = (np.pi*2)/self.T
+        rt2 = (np.pi*2)/T
 
         #define 1d weight and its derivatives
-        phi1  = (1-self.points**2)**self.n
-        dphi1 = -2*self.n*self.points*(1-self.points**2)**(self.n-1)
-        ddphi1= ( 4*self.n*(self.n-1)*self.points**2  - 2*self.n*(1-self.points**2))*(1-self.points**2)**(self.n-2)
+        phi1   = 1 - 2*self.points**2 + self.points**4
+        dphi1  = -4*self.points + 4*self.points**3
+        ddphi1 = -4 + 12 * self.points**2
 
         #construct 3d weights as products of 1d weights
         phi    = phi1[:, np.newaxis, np.newaxis] * phi1[np.newaxis, :, np.newaxis] * phi1[np.newaxis, np.newaxis, :]
@@ -150,14 +145,6 @@ class Weak_PINN():
         e3 = tf.expand_dims(e3, axis=1)
         e  = tf.concat((e1, e2, e3), axis=1)
 
-        #regularizer to discourage laminar flow
-        #laminar = forcing / 16.0 / self.nu
-        #reg = 1.0 + 1.0/tf.reduce_sum(tf.abs(w - laminar))
-        #reg = 1
-
         # build the PINN model for Burgers' equation
         return tf.keras.models.Model(
             inputs=[z], outputs=[e])
-
-    def print_period(self):
-        print( self.T )
