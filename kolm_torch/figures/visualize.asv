@@ -1,0 +1,27 @@
+clear
+
+L = 32;
+epoch = 1*1024;
+
+load("../network_output/L_sweep/torch_output_L_" + L + "_epoch_" + epoch + ".mat");
+
+tiledlayout(2,2);
+
+w = squeeze(f(:,:,:,1));
+
+nexttile
+imagesc( w(:,:,1).' );
+axis square;
+set(gca,'ydir', 'normal')
+
+nexttile
+semilogy( loss_history )
+
+nexttile
+scatter( xs(:,1), xs(:,2), 'filled' );
+axis square
+
+nexttile
+xs_NN = mod(xs_NN, 2*pi);
+scatter( xs_NN(:,1), xs_NN(:,2), 'filled' );
+axis square
