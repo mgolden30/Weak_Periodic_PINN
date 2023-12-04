@@ -11,8 +11,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def generate_samples_NN(n, pick):
     #n is the TOTAL number of subdomains we randomly sample
     xs = 2 * torch.pi * torch.rand( (n,3), requires_grad=True ) #need to diff with respect to these for flow
-
-    xs = generate_uniform_grid( int(np.ceil(n**(1.0/3))) )
+    #xs = generate_uniform_grid( int(np.ceil(n**(1.0/3))) )
     xs = xs.to(device)
 
     #xs = generate_uniform_grid(12)
@@ -33,9 +32,25 @@ def generate_uniform_grid(n):
     xs = torch.cat((x,y,t), axis=1).to(device)
     return xs
 
+def generate_uniform_grid2(ns):
+    #To penalize no time derivative, I will compute \partial_t \omega on a uniform grid
+    #n is now points per side instead of total number.
+    #This will not be in weak form.
+    x1 = torch.linspace( 0, ns[0]-1, ns[0], requires_grad=True ) / ns[0] * 2 * np.pi
+    x2 = torch.linspace( 0, ns[1]-1, ns[1], requires_grad=True ) / ns[1] * 2 * np.pi
+    x3 = torch.linspace( 0, ns[2]-1, ns[2], requires_grad=True ) / ns[2] * 2 * np.pi
+
+    [x,y,t] = torch.meshgrid( x1, x2, x3 )
+    x = torch.reshape( x, [-1,1])
+    y = torch.reshape( y, [-1,1])
+    t = torch.reshape( t, [-1,1])
+    xs = torch.cat((x,y,t), axis=1).to(device)
+    return xs
+
+
 def save_network_output( hydro_model, out_name, model_name, loss_history, xs, xs_NN ):
     # After training, you can use the trained model for predictions
-    ns=(64,64,32)
+    ns=(128,128,4)
 
     x_grid = torch.linspace( 0, 2*torch.pi, ns[0], requires_grad=True )
     y_grid = torch.linspace( 0, 2*torch.pi, ns[1], requires_grad=True )
@@ -67,8 +82,7 @@ def save_network_output( hydro_model, out_name, model_name, loss_history, xs, xs
     savemat(out_name, out_dict)
     torch.save( hydro_model, model_name )
 
-def reset_torch_seed():
+def reset_torch_seed( seed_value=142):
     # Set PyTorch seed for reproducibility
-    seed_value = 42
     torch.manual_seed(seed_value)
     torch.cuda.manual_seed_all(seed_value)

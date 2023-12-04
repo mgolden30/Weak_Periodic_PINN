@@ -1,4 +1,8 @@
 '''
+The purpose of this script is to take a model that has already been moderately converged with Adam
+and fine-tune the parameters
+'''
+'''
 The purpose of this script is to train several networks with varying hidden layer size L
 '''
 
@@ -15,11 +19,15 @@ from lib.utils import save_network_output, generate_samples_NN, reset_torch_seed
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #define the layer sizes we want to check
-Ls = [48]#, 64, 128, 256, 512]
+Ls = [128]#, 64, 128, 256, 512]
+
 
 output_folder = "network_output/L_sweep/"
 
-epochs = 1024*6 + 1
+epochs = 1024 #add the +1 so the final state is output
+
+#output every this many steps
+every = 10
 
 L_pick = 32
 
@@ -42,7 +50,8 @@ for L in Ls:
     stream_model = StreamfunctionNetwork(L).to(device)
     hydro_model  = HydroNetwork( stream_model ).to(device)
 
-    #hydro_model =   hydro_model = torch.load("network_output/L_sweep/hydromodelNN_Newton_L_64_epoch_200.pth")
+    hydro_model  = torch.load("network_output/L_sweep/hydromodelNN_L_128_epoch_1024.pth")
+
 
     pinn         = WeakPINN( hydro_model, nu, p ).to(device)
 
@@ -52,42 +61,43 @@ for L in Ls:
     criterion = nn.L1Loss()
 
     # Use an optimizer (e.g., Adam) to update the model parameters
-    optimizer      = optim.Adam(hydro_model.parameters(), lr=learning_rate )
-    optimizer_anti = optim.Adam(       pick.parameters(), lr=learning_rate_pick, maximize=True)
+    optimizer      = optim.LBFGS(hydro_model.parameters(), history_size=10, max_iter=20, line_search_fn='strong_wolfe' )
     
+    xs, xs_NN = generate_samples_NN(n, pick)
+
     loss_history = torch.zeros( (epochs) )
 
-    for epoch in range(epochs):
+    def closure():
         #generate new training data
-        xs, xs_NN = generate_samples_NN(n, pick)
+        xs, _ = generate_samples_NN(n, pick)
+        optimizer.zero_grad()  # Clear gradients
+        err = pinn.forward(xs, xs_uniform)
+        # Compute the MSE loss
+        loss = criterion(err, torch.zeros_like(err))
+        #loss.backward()  # Backward pass
+        loss.backward(retain_graph=True)   # compute gradients
+        return loss 
 
-        # Forward pass (with output of PickDomains!)
-        err = pinn.forward(xs_NN, xs_uniform)
+
+    for epoch in range(epochs):
+        # Forward pass
+        err = pinn.forward(xs, xs_uniform)
 
         # Compute the MSE loss
         loss = criterion(err, torch.zeros_like(err))  # assuming you want to minimize pinn.forward(xs) to zero
         loss_history[epoch] = loss.detach()
 
-        # clear previous gradients
-        optimizer.zero_grad()
-        optimizer_anti.zero_grad()
+        print(loss_history[epoch])
 
-        # compute gradients
-        loss.backward(retain_graph=True)   
-        
-        # update model parameters
-        optimizer.step()
-        optimizer_anti.step()
+        # Backward pass and optimization step
+        #optimizer.zero_grad()  # clear previous gradients
+        #loss.backward(retain_graph=True)   # compute gradients
+        optimizer.step(closure)  # update model parameters
 
         #save state every so often
-        if epoch % 1024 == 0:
-            matlb_file = output_folder + "torch_output_L_%d_epoch_%d.mat" % (L, epoch)
-            model_file = output_folder + "hydromodelNN_L_%d_epoch_%d.pth" % (L, epoch)
+        if epoch % every == 0:
+            matlb_file = output_folder + "torch_output_Newton_L_%d_epoch_%d.mat" % (L, epoch)
+            model_file = output_folder + "hydromodelNN_Newton_L_%d_epoch_%d.pth" % (L, epoch)
 
             save_network_output( hydro_model, matlb_file, model_file, loss_history, xs, xs_NN )
             print(f"Epoch {epoch}/{epochs}, Loss: {loss.item()}")
-
-            #reset optimizers
-            learning_rate = learning_rate/5
-            optimizer      = optim.Adam(hydro_model.parameters(), lr=learning_rate )
-            optimizer_anti = optim.Adam(       pick.parameters(), lr=learning_rate_pick, maximize=True)

@@ -89,8 +89,6 @@ class StreamfunctionNetwork(nn.Module):
 
         return y
 
-
-
 class HydroNetwork(nn.Module):
     def __init__(self, streamnetwork):
         super().__init__()
@@ -136,9 +134,9 @@ class WeakPINN(nn.Module):
         self.weights = torch.tensor(self.weights, dtype=torch.float32, requires_grad=False)
 
         D = 2*np.pi #domain size
-        Hx = D/16
-        Hy = D/16
-        Ht = D/16
+        Hx = D/8
+        Hy = D/8
+        Ht = D/8
         self.H = np.array( [Hx, Hy, Ht] ) #sidelengths of boxes for weak formulation
 
         #keep these in the range [-1,1]
@@ -189,14 +187,16 @@ class WeakPINN(nn.Module):
         #Let zs be the quadrature points for all sampled subdomains
         #We will need three new axis for identifying quadrature points
         zs = xs[np.newaxis, np.newaxis, np.newaxis, ...]
-
         zs = zs + self.displacement
 
+        #Compute the forcing
+        forcing = 4 * torch.cos( 4 * zs[...,1] )
+
         #reshape the sample points to trick the network
-        zs2 = torch.reshape( zs, [-1,3] )
+        zs = torch.reshape( zs, [-1,3] )
 
         #compute fields f = [w,u,v,T,a] at all quadrature points
-        f = self.model(zs2) 
+        f = self.model(zs) 
 
         p = self.p
         f = torch.reshape( f, [p,p,p,-1,5] )
@@ -208,15 +208,11 @@ class WeakPINN(nn.Module):
         T = f[...,3] #period
         a = f[...,4] #drift rate
 
-        #Compute the forcing
-        forcing = 4 * torch.cos( 4 * zs[...,1] )
-
         # rescalings for derivatives based on affine transformation to canonical [-1,1]
         rx = 2.0/self.H[0]
         ry = 2.0/self.H[1]
         rt = 2.0/self.H[2]
         rt2 = (2*np.pi)/T
-
 
         #equation 1: voriticity dynamics
         eq1= - rt2 * rt * self.phi_dt * w \
@@ -226,14 +222,24 @@ class WeakPINN(nn.Module):
              - self.phi * forcing
         err = torch.sum( self.weight * eq1, axis=[0,1,2] )
 
-
         #now, compute a penalty for not changing in time
         #we will just add a pole around dwdt = 0.
         '''
-        fu  = self.model(xs_uniform)
-        dfu = torch.autograd.grad(fu, xs_uniform, grad_outputs=torch.ones_like(fu), create_graph=True)[0]
-        dwdt = dfu[..., 2]
+        zs2 = xs_uniform[np.newaxis, np.newaxis, np.newaxis, ...]
+        zs2 = zs2 + self.displacement
+        zs2 = torch.reshape( zs2, [-1,3] )
+
+        #compute fields f = [w,u,v,T,a] at all quadrature points
+        f2 = self.model(zs2)
+        p = self.p
+        f2 = torch.reshape( f2, [p,p,p,-1,5] )
+        w2 = f2[..., 0] #pick out the vorticity
+        w2 = w2.to(device)
+
+        dwdt = torch.sum( self.weight * self.phi_dt * w2, axis=[0,1,2] )
+
         penalty = 1 + 1.0/torch.mean( dwdt**2 )
         err = err * penalty
         '''
+
         return err
