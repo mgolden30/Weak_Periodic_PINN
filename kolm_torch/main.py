@@ -7,6 +7,10 @@ from torch import nn
 from lib.model import StreamfunctionNetwork, HydroNetwork, WeakPINN
 from scipy.io import savemat
 
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
+
 # Set PyTorch seed for reproducibility
 seed_value = 420
 torch.manual_seed(seed_value)
@@ -16,8 +20,8 @@ epochs = 1024
 
 nu = 1.0/40 #fluid viscosity
 p  = 4      #points in each direction for Gaussian quadrature
-
-n  = 8**3 #number of subdomain to train on
+L  = 16     #number of nodes in hidden layers
+n  = 8**3   #number of subdomain to train on
 
 def generate_samples(n):
     #n is the TOTAL number of subdomains we randomly sample
@@ -63,12 +67,11 @@ def save_network_output( hydro_model, out_name ):
     savemat(out_name, out_dict)
 
 
-xs = generate_samples(n)
+xs = generate_samples(n).to(device)
 #I'm hoping a sparse grid is fine to compute penalty
-xs_uniform = generate_uniform_grid(3) 
+xs_uniform = generate_uniform_grid(3).to(device) 
 
-
-stream_model = StreamfunctionNetwork()
+stream_model = StreamfunctionNetwork(L)
 hydro_model  = HydroNetwork( stream_model )
 
 hydro_model = torch.load('trained_model.pth')
@@ -85,20 +88,9 @@ criterion = nn.MSELoss()
 
 # Use an optimizer (e.g., Adam) to update the model parameters
 optimizer = optim.Adam(hydro_model.parameters(), lr=0.001)
-#optimizer = optim.LBFGS(hydro_model.parameters(), lr=0.005)
 
 loss_history = torch.zeros( (epochs) )
 
-'''
-def closure():
-    optimizer.zero_grad()  # Clear gradients
-    err = pinn.forward(xs)
-    # Compute the MSE loss
-    loss = criterion(err, torch.zeros_like(err))
-    #loss.backward()  # Backward pass
-    loss.backward(retain_graph=True)   # compute gradients
-    return loss
-'''
 
 for epoch in range(epochs):
     #generate new training data

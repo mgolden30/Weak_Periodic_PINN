@@ -1,0 +1,48 @@
+%Compute spectra of Jacobian with power iteration
+
+load("candidate_1.mat");
+
+J = @(dw) velocity_jacobian( w, dw, N, forcing, nu );
+
+%make a guess
+eigen_vector = cos(2*y);
+lambda = 20 + 1i;
+
+z = [ reshape(eigen_vector, [N*N,1]); lambda ];
+
+k = 0:N-1; k(k>N/2) = k(k>N/2) - N;
+kx = k;
+ky = k';
+
+%Construct spectral operators to go from vorticity to velocity
+k_sq = kx.^2 + ky.^2;
+k_inv = 1./k_sq;
+k_inv(1,1) = 1;
+
+F = @(z) [ J(z(1:end-1)) - z(end) * to_vec(real(ifft2( k_inv.* fft2( to_mat(z(1:end-1))) ))); max(abs(z(1:end-1))) - 1];
+
+%%
+maxit = 1024;
+inner = 64;
+outer = 1;
+tol = 1e-6;
+
+for i = 1:maxit
+  %Define an objective function
+  F0= F(z);
+  fprintf("step %03d: |F| = %e\t lambda = %e + %e\n", i, norm(F0), real(z(end)), imag(z(end)) );
+
+  %Finite difference for the action of the Jacobian
+  h = 1e-3;
+  J = @(v) (F(z + h*v)-F0)/h;
+
+  %Solve for 
+  [dz, ~] = gmres( J, F0, inner, tol, outer);
+  z = z - 0.1*dz;
+
+  imagesc( real(to_mat(z(1:end-1))) );
+  axis square
+  colorbar();
+  colormap bluewhitered
+  drawnow;
+end

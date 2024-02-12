@@ -6,7 +6,7 @@ from torch import nn
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+device = "cpu"
 
 class PickDomains(nn.Module):
     def __init__(self, L):
