@@ -8,7 +8,8 @@ N = 128;
 %guess an equilibria
 forcing = 4*cos(4*y);
 nu = 1/40;
-w = sin(x) + cos(y);
+w = (sin(x).*cos(y)).^2;
+w = w - mean(w, 'all');
 
 %Macros for reshaping
 to_vec = @(x) reshape(x, [N*N,1]);
@@ -18,11 +19,11 @@ w = to_vec(w);
 
 %%
 clf;
-load("candidate_5.mat");
+load("candidate_1.mat");
 
-maxit = 1024;
-inner = 64;
-outer = 1;
+maxit = 0;
+inner = 32;
+outer = 8;
 tol = 1e-6;
 
 for i = 1:maxit
@@ -45,6 +46,7 @@ for i = 1:maxit
   axis square
   colorbar();
   clim([-10 10]);
-  colormap bluewhitered
+  colormap jet;
+  %colormap bluewhitered
   drawnow;
 end

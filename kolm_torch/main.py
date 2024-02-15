@@ -4,7 +4,11 @@ import torch
 
 import torch.optim as optim
 from torch import nn
-from lib.model import StreamfunctionNetwork, HydroNetwork, WeakPINN
+
+
+from lib.model import StreamfunctionNetwork_RBF, HydroNetwork, WeakPINN
+from lib.utils import generate_uniform_grid
+
 from scipy.io import savemat
 
 
@@ -16,12 +20,20 @@ seed_value = 420
 torch.manual_seed(seed_value)
 torch.cuda.manual_seed_all(seed_value)
 
-epochs = 1024
+epochs = 4*1024
 
 nu = 1.0/40 #fluid viscosity
 p  = 4      #points in each direction for Gaussian quadrature
-L  = 16     #number of nodes in hidden layers
-n  = 8**3   #number of subdomain to train on
+#L  = 16    #number of nodes in hidden layers
+n  = 4**3   #number of subdomain to train on
+
+
+#RBF parameters
+length = 0.5 #characteristic length of rbfs in sin/cos space No truncation needed if length >= 2
+power  = 2 #power of envelope polynomial used as rbf
+n_cent = 4 #centers per dimnension for rbf. Total number will be n_cent^3
+
+
 
 def generate_samples(n):
     #n is the TOTAL number of subdomains we randomly sample
@@ -71,10 +83,10 @@ xs = generate_samples(n).to(device)
 #I'm hoping a sparse grid is fine to compute penalty
 xs_uniform = generate_uniform_grid(3).to(device) 
 
-stream_model = StreamfunctionNetwork(L)
+stream_model = StreamfunctionNetwork_RBF( n_cent, power, length )
 hydro_model  = HydroNetwork( stream_model )
 
-hydro_model = torch.load('trained_model.pth')
+#hydro_model = torch.load('trained_model.pth')
 
 pinn         = WeakPINN( hydro_model, nu, p )
 

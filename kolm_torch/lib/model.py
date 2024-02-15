@@ -57,6 +57,52 @@ class PeriodicLayer(nn.Module):
         return y
 
 
+class StreamfunctionNetwork_RBF(nn.Module):
+    def __init__(self, n, power, length):
+        '''
+        INPUT:
+        n - number of  centers for radial basis function per dimension (n^3) in total
+        '''
+        super().__init__()
+        self.power = power   #power for rbf function
+        self.length= length  #length scale of rbf function
+
+        self.per          = PeriodicLayer()
+        self.linear_layer = nn.Linear(  n*n*n,  1 ) #single output is streamfunction
+        
+        grid_1d = torch.linspace(start=0, end=n-1, steps=n )*2*torch.pi/n
+        x, y, t = torch.meshgrid( grid_1d, grid_1d, grid_1d )
+        x = torch.reshape(x, (n*n*n,1) )
+        y = torch.reshape(y, (n*n*n,1) )
+        t = torch.reshape(t, (n*n*n,1) )
+        c = torch.cat( (x,y,t), dim=1 ) #centers is size [n*n*n,3], just like the network input
+
+        #Since it is just like the network input, we can apply the periodic layer
+        c = self.per(c)
+        #add a dimension so it is [1,n*n*n,6]
+        self.centers = torch.reshape( c, (1, n*n*n, 6) )
+
+    def forward(self, x):
+        #Step 1: periodic layer
+        x = self.per(x) 
+
+        #Step 2: Radial Basis Function layer
+        x = torch.reshape( x, (-1, 1, 6) )
+        d = torch.sum( torch.square(x - self.centers), dim=2) #Euclidean distance to centers squared
+        d = d/self.length/self.length
+
+        compact = (1-d > 0)
+        x = (1-d)**self.power*compact #compute a compact polynomial
+        #x = (1-d)**self.power * torch.heaviside(1-d, values=torch.tensor(1.0)) #compute a compact polynomial
+
+        #Step 3: Linear layer
+        psi = self.linear_layer(x)
+        return psi
+
+
+
+
+
 
 class StreamfunctionNetwork(nn.Module):
     def __init__(self, L):
@@ -68,8 +114,6 @@ class StreamfunctionNetwork(nn.Module):
         self.layer2 = nn.Linear(  L,  L ) 
         self.layer3 = nn.Linear(  L,  1 ) #single output is streamfunction
         
-        self.conv1 = nn.Conv1d( in_channels=1, out_channels=L, kernel_size=3, stride=1, padding=1)
-
     def forward(self, x):
         #force network to learn periodic functions of the input
         y = self.per(x)
