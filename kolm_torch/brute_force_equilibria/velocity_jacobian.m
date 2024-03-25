@@ -1,10 +1,17 @@
-function Jdw = velocity_jacobian( w, dw, N, forcing, nu )
+function Je = velocity_jacobian( state, e, N, forcing, nu )
   %{
-  Compute the exact action of the Jacobian on dw
+  Compute the exact action of the Jacobian on e
   %}
 
-  w = reshape(w, [N,N]); %should be passed in as vector
-  dw= reshape(dw,[N,N]); %should be passed in as vector
+  %Code this to evaluate the action of the Jacobian on many tangent vectors
+  %at the same time. This allows block_GMRES to work.
+  m = size(e,2);
+
+  %Extract fields
+  w  = reshape( state(1:N*N), [N,N]   );
+  u0 = reshape( state(N*N+1), [1,1]   );
+  ew = reshape( e(1:N*N,:),   [N,N,m] );
+  eu0= reshape( e(N*N+1,:),   [1,1,m] );
 
   k = 0:N-1; k(k>N/2) = k(k>N/2) - N;
   kx = k;
@@ -18,32 +25,31 @@ function Jdw = velocity_jacobian( w, dw, N, forcing, nu )
   to_v(1,1) = 0;
 
   wf = fft2(w);
-  dwf= fft2(dw);
+  ewf= fft2(ew);
 
-
-  u  = real(ifft2( to_u .* wf ));
-  v  = real(ifft2( to_v .* wf ));
-  wx = real(ifft2( 1i*kx.* wf ));
-  wy = real(ifft2( 1i*ky.* wf ));
-  %dis= real(ifft2( k_sq .* wf )); %Don't need
-
-  du  = ifft2( to_u .* dwf );
-  dv  = ifft2( to_v .* dwf );
-  dwx = ifft2( 1i*kx.* dwf );
-  dwy = ifft2( 1i*ky.* dwf );
-  ddis= ifft2( k_sq .* dwf );
-
+  u   = real(ifft2( to_u .* wf )) + u0;
+  v   = real(ifft2( to_v .* wf ));
+  wx  = real(ifft2( 1i*kx.* wf ));
+  wy  = real(ifft2( 1i*ky.* wf ));
+  
+  eu  = real(ifft2( to_u .* ewf )) + eu0;
+  ev  = real(ifft2( to_v .* ewf ));
+  ewx = real(ifft2( 1i*kx.* ewf ));
+  ewy = real(ifft2( 1i*ky.* ewf ));
+  edis= real(ifft2( k_sq .* ewf )); %laplacian of w
 
   %Take the derivative
-  %vel = -u.*wx - v.*wy - nu*dis + forcing;
-  Jdw = -u.*dwx - v.*dwy ...
-        -du.*wx - dv.*wy ...
-        -nu*ddis;
-
+  %f = -u.*wx - v.*wy - nu*dis + forcing;
+  df  = -u.*ewx - v.*ewy ...
+        -eu.*wx - ev.*wy ...
+        -nu*edis;
+  
   %Try taking the anti-Laplacian
   k_inv = 1./k_sq;
   k_inv(1,1) = 1;
-  Jdw = ifft2( k_inv.*fft2(Jdw) );
-
-  Jdw = reshape( Jdw, [N*N,1]);
+  df = real(ifft2( k_inv.*fft2(df) ));
+  
+  Je = zeros([N*N+1,m]);
+  Je(1:N*N, :) = reshape( df, [N*N,m] );
+  Je(N*N+1, :) = sum(wx.*ew, [1,2]); %dot product with x derivative.
 end

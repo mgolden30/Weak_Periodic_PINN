@@ -6,7 +6,10 @@ import torch
 import numpy as np
 from scipy.io import savemat
 
+from lib.hail_mary import PotentialPINN
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
 def generate_samples_NN(n, pick):
     #n is the TOTAL number of subdomains we randomly sample
@@ -86,3 +89,37 @@ def reset_torch_seed( seed_value=142):
     # Set PyTorch seed for reproducibility
     torch.manual_seed(seed_value)
     torch.cuda.manual_seed_all(seed_value)
+
+
+
+def save_potential_network_output( hydro_model, out_name, loss_history ):
+    # After training, you can use the trained model for predictions
+    ns=(64,64,32)
+    
+    x_grid = torch.linspace( 0, 2*torch.pi, ns[0], requires_grad=True )
+    y_grid = torch.linspace( 0, 2*torch.pi, ns[1], requires_grad=True )
+    t_grid = torch.linspace( 0, 2*torch.pi, ns[2], requires_grad=True )
+    [x,y,t] = torch.meshgrid( (x_grid, y_grid, t_grid) )
+
+    x = torch.reshape( x, [-1,1] )
+    y = torch.reshape( y, [-1,1] )
+    t = torch.reshape( t, [-1,1] )
+
+
+    xs   = torch.cat( (x,y,t), dim=1 )
+    pinn = PotentialPINN( hydro_model )
+    err = pinn(xs)
+    err = torch.reshape( err, [ns[0],ns[1],ns[2],-1] )
+
+    f_final = hydro_model.forward(xs)
+
+    f_final = f_final.detach().numpy()
+    x_grid  = x_grid.detach().numpy()
+    y_grid  = y_grid.detach().numpy()
+    t_grid  = t_grid.detach().numpy()
+    err     = err.detach().numpy()
+
+    f_final = np.reshape( f_final, [ns[0], ns[1], ns[2], -1] )
+
+    out_dict =  {"f": f_final, "x_grid": x_grid, "y_grid": y_grid, "t_grid": t_grid, "loss_history": loss_history, "err":err }
+    savemat(out_name, out_dict)
