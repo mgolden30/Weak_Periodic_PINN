@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from scipy.io import savemat
 
-from lib.hail_mary import PotentialPINN
+import scipy.io as sio
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = "cpu"
@@ -91,35 +91,36 @@ def reset_torch_seed( seed_value=142):
     torch.cuda.manual_seed_all(seed_value)
 
 
+import numpy as np
+import scipy.io as sio
+import torch
 
-def save_potential_network_output( hydro_model, out_name, loss_history ):
-    # After training, you can use the trained model for predictions
-    ns=(64,64,32)
-    
-    x_grid = torch.linspace( 0, 2*torch.pi, ns[0], requires_grad=True )
-    y_grid = torch.linspace( 0, 2*torch.pi, ns[1], requires_grad=True )
-    t_grid = torch.linspace( 0, 2*torch.pi, ns[2], requires_grad=True )
-    [x,y,t] = torch.meshgrid( (x_grid, y_grid, t_grid) )
+def save_dual_network_output(network, points_per_side, matfile_name_prefix, loss_history):
+    # Create a uniform mesh over [0, 2*pi]^3
+    x = np.linspace(0, 2*np.pi, points_per_side)
+    y = np.linspace(0, 2*np.pi, points_per_side)
+    z = np.linspace(0, 2*np.pi, points_per_side)
+    X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+    points = np.stack((X.flatten(), Y.flatten(), Z.flatten()), axis=1)
+    points = torch.tensor(points, dtype=torch.float32, requires_grad=True )
 
-    x = torch.reshape( x, [-1,1] )
-    y = torch.reshape( y, [-1,1] )
-    t = torch.reshape( t, [-1,1] )
+    # Evaluate the fields using the network
+    fields = network.hydro(points)
+    points = points.detach().cpu().numpy()
 
+    # Define field names and corresponding indices
+    field_names = ['w', 'uw', 'vw', 'w2', 'uw2', 'vw2']  # Add more field names as needed
+    field_indices = [0, 1, 2, 3, 4, 5]  # Indices corresponding to uw, vw, w in the fields array
 
-    xs   = torch.cat( (x,y,t), dim=1 )
-    pinn = PotentialPINN( hydro_model )
-    err = pinn(xs)
-    err = torch.reshape( err, [ns[0],ns[1],ns[2],-1] )
+    # Construct dictionary to store fields and points
+    fields_dict = {'points': points, 'loss': loss_history}
 
-    f_final = hydro_model.forward(xs)
+    # Save the fields to the dictionary
+    for field_name, field_index in zip(field_names, field_indices):
+        field_data = fields[field_index].detach().cpu().numpy()
+        field_data = field_data.reshape(points_per_side, points_per_side, points_per_side)
+        fields_dict[field_name] = field_data
 
-    f_final = f_final.detach().numpy()
-    x_grid  = x_grid.detach().numpy()
-    y_grid  = y_grid.detach().numpy()
-    t_grid  = t_grid.detach().numpy()
-    err     = err.detach().numpy()
-
-    f_final = np.reshape( f_final, [ns[0], ns[1], ns[2], -1] )
-
-    out_dict =  {"f": f_final, "x_grid": x_grid, "y_grid": y_grid, "t_grid": t_grid, "loss_history": loss_history, "err":err }
-    savemat(out_name, out_dict)
+    # Save the dictionary to a matfile
+    matfile_name = f'{matfile_name_prefix}_fields.mat'
+    sio.savemat(matfile_name, fields_dict)
