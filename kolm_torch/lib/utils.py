@@ -11,17 +11,16 @@ import scipy.io as sio
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = "cpu"
 
-def generate_samples_NN(n, pick):
+def generate_samples(n):
     #n is the TOTAL number of subdomains we randomly sample
     xs = 2 * torch.pi * torch.rand( (n,3), requires_grad=True ) #need to diff with respect to these for flow
     #xs = generate_uniform_grid( int(np.ceil(n**(1.0/3))) )
     xs = xs.to(device)
 
     #xs = generate_uniform_grid(12)
-
-    xs_NN = pick.forward(xs)
+    #xs_NN = pick.forward(xs)
     
-    return xs, xs_NN
+    return xs
 
 def generate_uniform_grid(n):
     #To penalize no time derivative, I will compute \partial_t \omega on a uniform grid
@@ -53,7 +52,7 @@ def generate_uniform_grid2(ns):
 
 def save_network_output( hydro_model, out_name, model_name, loss_history, xs, xs_NN ):
     # After training, you can use the trained model for predictions
-    ns=(128,128,4)
+    ns=(64,64,16)
 
     x_grid = torch.linspace( 0, 2*torch.pi, ns[0], requires_grad=True )
     y_grid = torch.linspace( 0, 2*torch.pi, ns[1], requires_grad=True )

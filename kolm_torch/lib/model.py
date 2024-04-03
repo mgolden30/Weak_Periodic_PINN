@@ -225,7 +225,7 @@ class WeakPINN(nn.Module):
         self.phi_ddy = phi_ddy[:,:,:,np.newaxis].to(device)
         self.weight  = weight[:,:,:,np.newaxis].to(device)
 
-    def forward(self, xs, xs_uniform):
+    def forward(self, xs):
         # equation input: 
         # xs = (x,y,t) of size [n,3]
         # xs_uniform is the same, but a static uniform mesh to estimate the state velocity on.
