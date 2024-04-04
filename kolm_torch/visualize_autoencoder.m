@@ -2,12 +2,13 @@ clear;
 load("predictions.mat");
 
  vidObj = VideoWriter('autoenc.avi');
-    open(vidObj);
+ open(vidObj);
 
 clf
 colormap jet
 
 for i = 1:5:size(w_batch, 3)
+  i
   w_auto = squeeze( predictions(i,:) );
   w_auto = reshape( w_auto, [64,64] );
   w_true = squeeze( w_batch(:,:,i) );
@@ -34,12 +35,11 @@ for i = 1:5:size(w_batch, 3)
   drawnow
 
   % Write each frame to the file.
-       currFrame = getframe(gcf);
-       writeVideo(vidObj,currFrame);
-    end
-  
-    % Close the file.
-    close(vidObj);
+  currFrame = getframe(gcf);
+  writeVideo(vidObj,currFrame);
+end  
+% Close the file.
+close(vidObj);
 
 function nice_imagesc( data )
   imagesc(data);

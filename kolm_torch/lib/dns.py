@@ -90,7 +90,7 @@ forcing = 4*np.cos(4*y)
 
 dt = 0.025
 nu = 1.0/40
-timesteps = 1024*8
+timesteps = 1024*32
 
 w = generate_traj(w0, dt, nu, forcing, timesteps)
 

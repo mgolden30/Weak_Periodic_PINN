@@ -2,12 +2,13 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from lib.autoencoder import Encoder, Decoder
+from lib.model import HydroNetwork
 from scipy.io import savemat, loadmat
 import numpy as np
 
 # Load data
 data = loadmat("w_traj.mat")
-w = torch.tensor(data["psi"][:, :, 1000::30], dtype=torch.float32)
+w = torch.tensor(data["w"][:, :, 1000::100], dtype=torch.float32)
 x = torch.tensor(data["x"], dtype=torch.float32)
 y = torch.tensor(data["y"], dtype=torch.float32)
 
@@ -16,10 +17,13 @@ w = w.permute(2, 0, 1)
 x = torch.reshape( x, [-1, 1] )
 y = torch.reshape( y, [-1, 1] )
 xs = torch.cat((x, y), dim=1)
+xs.requires_grad = True #So we can target the vorticity
 
 # Define dataset and dataloader
 dataset = TensorDataset(w)
-dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+
+batch_size = 1
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # Define encoder and decoder
 latent_dim = 64
@@ -40,9 +44,15 @@ for epoch in range(num_epochs):
 
         optimizer.zero_grad()
         l_batch = enc(w_batch)
-        w_out = dec(l_batch, xs)
+        psi = dec(l_batch, xs)
 
-        #Make them the same size
+        #The decoder output right now is the streamfunction. Take the Laplacian
+        #autodiff the streamfunction
+        #print(  psi.shape )
+        dpsi  = torch.autograd.grad(psi, xs, grad_outputs=torch.ones_like(psi), create_graph=True)[0]
+        w_out =-torch.autograd.grad(dpsi[:, 0], xs, grad_outputs=torch.ones_like(dpsi[:,0]), create_graph=True, retain_graph=True)[0][:, 0] \
+               -torch.autograd.grad(dpsi[:, 1], xs, grad_outputs=torch.ones_like(dpsi[:,1]), create_graph=True, retain_graph=True)[0][:, 1]
+
         w_out = torch.reshape(w_out, w_batch.shape )
 
         loss = criterion(w_out, w_batch )

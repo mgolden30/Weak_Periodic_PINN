@@ -8,8 +8,13 @@ N = 128;
 %guess an equilibria
 forcing = 4*cos(4*y);
 nu = 1/40;
-w = sin(x-1).*sin(y+2) + sin(2*x).*sin(2*y+3) - cos(x+4).*sin(3*y-7);
+%w = sin(x-1).*sin(y+2) + sin(2*x).*sin(2*y+3) - cos(x+4).*sin(3*y-7);
 %w = -sin(3*x-2).*sin(y+x) + cos(x-y-1) + sin(y-1);
+
+seed = 400;
+w = generate_random_noise( seed, N );
+
+
 w = w - mean(w, 'all');
 w = 10*w;
 
@@ -17,14 +22,14 @@ w = 10*w;
 to_vec = @(x) reshape(x, [N*N,1]);
 to_mat = @(x) reshape(x, [N,N]  );
 
-u0 = -0.01;
+u0 = 0;
 state = [to_vec(w); u0];
 
 %%
 clf;
-%load("ECS\EQ2.mat");
+load("ECS\REQ2.mat");
 
-damp  = 0.1;
+damp  = 1;
 maxit = 128;
 inner = 32;
 outer = 1;
@@ -113,4 +118,18 @@ function make_nice_images( state, F0, N )
 
   %title("$\nu = 1/40$");
   return;
+end
+
+function w = generate_random_noise( seed, N )
+  rng(seed);
+
+  k = 0:N-1;
+  k(k>N/2) = k(k>N/2) - N;
+  w = (2*rand(N,N)-1) + 1i*(2*rand(N,N) - 1);
+
+  w(k.^2 + k'.^2 > 6) = 0;
+  w(1,1) = 0;
+
+  w = real(ifft2(w));
+  w = w/max(max(abs(w)));
 end
