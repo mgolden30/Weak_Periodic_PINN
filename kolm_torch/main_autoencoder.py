@@ -8,21 +8,26 @@ import numpy as np
 
 # Load data
 data = loadmat("w_traj.mat")
-w = torch.tensor(data["w"][:, :, 1000::100], dtype=torch.float32)
+w = torch.tensor(data["w"], dtype=torch.float32)
 x = torch.tensor(data["x"], dtype=torch.float32)
 y = torch.tensor(data["y"], dtype=torch.float32)
 
-# Permute dimensions for training
+#w is saved as [n,n,nt,tr] where n is grid resolution, nt is timepoints, tr is number of trials
+#For our purposes, we can combint nt and tr
+n = w.shape[0]
+w = torch.reshape( w, [n,n,-1] )
+
+# Permute dimensions for training [n,n,b] -> [b,n,n]
 w = w.permute(2, 0, 1)
 x = torch.reshape( x, [-1, 1] )
 y = torch.reshape( y, [-1, 1] )
 xs = torch.cat((x, y), dim=1)
-xs.requires_grad = True #So we can target the vorticity
+#xs.requires_grad = True #So we can target the vorticity
 
 # Define dataset and dataloader
 dataset = TensorDataset(w)
 
-batch_size = 1
+batch_size = 16
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # Define encoder and decoder
@@ -37,24 +42,25 @@ criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=0.001)
 
 # Training loop
-num_epochs = 64
+num_epochs = 256
 for epoch in range(num_epochs):
     for batch in dataloader:
         w_batch = batch[0]
 
         optimizer.zero_grad()
         l_batch = enc(w_batch)
-        psi = dec(l_batch, xs)
+        w_out = dec(l_batch, xs)
 
+        '''
         #The decoder output right now is the streamfunction. Take the Laplacian
         #autodiff the streamfunction
         #print(  psi.shape )
         dpsi  = torch.autograd.grad(psi, xs, grad_outputs=torch.ones_like(psi), create_graph=True)[0]
         w_out =-torch.autograd.grad(dpsi[:, 0], xs, grad_outputs=torch.ones_like(dpsi[:,0]), create_graph=True, retain_graph=True)[0][:, 0] \
                -torch.autograd.grad(dpsi[:, 1], xs, grad_outputs=torch.ones_like(dpsi[:,1]), create_graph=True, retain_graph=True)[0][:, 1]
+        '''
 
         w_out = torch.reshape(w_out, w_batch.shape )
-
         loss = criterion(w_out, w_batch )
         loss.backward()
         optimizer.step()

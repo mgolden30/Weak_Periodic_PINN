@@ -7,12 +7,18 @@ import numpy as np
 
 # Load data
 data = loadmat("w_traj.mat")
-w = torch.tensor(data["psi"][:, :, 1000:2000], dtype=torch.float32)
+w = torch.tensor(data["w"][:], dtype=torch.float32)
 x = torch.tensor(data["x"], dtype=torch.float32)
 y = torch.tensor(data["y"], dtype=torch.float32)
+#w is saved as [n,n,nt,tr] where n is grid resolution, nt is timepoints, tr is number of trials
+#For our purposes, we can combint nt and tr
+w_shape = w.shape
+n = w.shape[0]
+w = torch.reshape( w, [n,n,-1] )
 
-# Permute dimensions for training
+# Permute dimensions for training [n,n,b] -> [b,n,n]
 w = w.permute(2, 0, 1)
+
 x = torch.reshape( x, [-1, 1] )
 y = torch.reshape( y, [-1, 1] )
 xs = torch.cat((x, y), dim=1)
@@ -48,5 +54,10 @@ with torch.no_grad():
 predictions = np.concatenate(predictions, axis=0)
 latent_space = np.concatenate(latent_space, axis=0)
 
+w = w.permute(2,1,0)
+w = torch.reshape( w, w_shape)
+predictions = torch.reshape( predictions, w_shape)
+
+
 # Save predictions, w_batch, and latent space to a matfile
-savemat("predictions.mat", {"predictions": predictions, "w_batch": w.permute(1, 2, 0).cpu().numpy(), "latent_space": latent_space})
+savemat("predictions.mat", {"predictions": predictions, "w_batch": w.cpu().numpy(), "latent_space": latent_space})

@@ -1,0 +1,58 @@
+clear;
+load("equivariant_predictions.mat");
+
+ vidObj = VideoWriter('autoenc.avi');
+ open(vidObj);
+
+clf
+colormap jet
+
+for tr= 1:size(w,4)
+for t = 1:size(w,3)
+
+  %output of autoencoder
+  w_auto = squeeze( predictions(i,:,:) );
+ 
+  %training data
+  w_true = squeeze( w(i,:,:) );
+
+  tiledlayout(2,2);
+  
+  nexttile
+  nice_imagesc( w_true' );
+  title("DNS $\omega$", "interpreter", "latex");
+  
+  nexttile
+  nice_imagesc( w_auto' );
+  title("autoencoder $\omega$", "interpreter", "latex");
+
+  nexttile
+  nice_imagesc( w_true' - w_auto );
+  title("difference", "interpreter", "latex");
+  
+  nexttile
+  %plot( latent_space(i,:), 'o' );
+  nice_imagesc( reshape(latent_space(i,:,:), [8,8] )' );
+  clim([0,1]);
+  title("latent space coordinates");
+
+  set(gcf, "color", "w");
+
+  drawnow
+
+  % Write each frame to the file.
+  currFrame = getframe(gcf);
+  writeVideo(vidObj,currFrame);
+end  
+% Close the file.
+close(vidObj);
+
+function nice_imagesc( data )
+  imagesc(data);
+  colorbar();
+  axis square
+  clim( [-1, 1] * 10 );
+
+  set(gca, 'ydir', 'normal');
+  
+end

@@ -1,5 +1,5 @@
 clear;
-load("predictions.mat");
+load("equivariant_predictions.mat");
 
  vidObj = VideoWriter('autoenc.avi');
  open(vidObj);
@@ -7,17 +7,17 @@ load("predictions.mat");
 clf
 colormap jet
 
-for i = 1:5:size(w_batch, 3)
-  i
-  w_auto = squeeze( predictions(i,:) );
-  w_auto = reshape( w_auto, [64,64] );
-  w_true = squeeze( w_batch(:,:,i) );
+for tr= 1:size(w,2)
+for t = 1:10:size(w,1)
 
+  w_auto = squeeze( predictions(t,tr,:,:) );
+  w_true = squeeze( w(t,tr,:,:) );
+  latent = squeeze(latent_space( t,tr,:,:,1) );
 
   tiledlayout(2,2);
   
   nexttile
-  nice_imagesc( w_true' );
+  nice_imagesc( w_true );
   title("DNS $\omega$", "interpreter", "latex");
   
   nexttile
@@ -25,25 +25,33 @@ for i = 1:5:size(w_batch, 3)
   title("autoencoder $\omega$", "interpreter", "latex");
 
   nexttile
-  nice_imagesc( w_true' - w_auto );
+  nice_imagesc( w_true - w_auto );
   title("difference", "interpreter", "latex");
   
   nexttile
-  plot( latent_space(i,:), 'o' );
+  %plot( latent_space(i,:), 'o' );
+  nice_imagesc( latent );
+  clim([0,1]);
   title("latent space coordinates");
+
+  set(gcf, "color", "w");
 
   drawnow
 
   % Write each frame to the file.
   currFrame = getframe(gcf);
   writeVideo(vidObj,currFrame);
-end  
+end
+end
 % Close the file.
 close(vidObj);
 
 function nice_imagesc( data )
-  imagesc(data);
+  imagesc(data');
   colorbar();
   axis square
-  clim( [-1, 1] );
+  clim( [-1, 1] * 10 );
+
+  set(gca, 'ydir', 'normal');
+  
 end

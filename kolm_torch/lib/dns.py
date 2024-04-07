@@ -1,5 +1,6 @@
 '''
-This code produces functions for Direct Numeical Simulation (DNS) of Navier-Stokes
+This code produces functions for Direct Numeical Simulation (DNS) of Navier-Stokes.
+Running this script will compute several trajectories with RK4 from random smooth intial conditions.
 '''
 
 import numpy as np
@@ -23,6 +24,32 @@ def dealias( w ):
     w = np.real(np.fft.ifft2(wf))
     return w
 
+def random_initial_data(n, amplitude):
+    '''
+    Generate some random fourier modes
+    '''
+
+    #generate a whole mesh of random Fourier coefficients
+    wf = (2*np.random.rand(n,n)-1) + 1j*(2*np.random.rand(n,n)-1)
+
+    #Set mean vorticity to zero since it has to be
+    wf[0,0] = 0
+    
+    #throw out high mode information
+    k = np.arange(0,n,1)
+    bad = k>n/2
+    k[bad] = k[bad] - n
+    kx = np.reshape( k, [n,1] )
+    ky = np.reshape( k, [1,n] )
+    high_modes = (kx*kx + ky*ky > 16)
+    wf[high_modes] = 0
+
+    #transform to real space
+    w = np.real( np.fft.ifft2(wf) )
+    
+    #Rescale to max value is equal to amplitude
+    w = amplitude * w / np.max(np.max(np.abs(w)))
+    return w
 
 
 def time_deriv( w, nu, forcing ):
@@ -77,36 +104,36 @@ def generate_traj(w0, dt, nu, forcing, timesteps):
         w[:,:,i+1] = rk4_step(w[:,:,i], dt, nu, forcing)
     return w
 
-# Define the number of points along x and y axes
-n = 64  # Adjust this as needed
 
-# Generate the x and y values in the range [0, 2*pi]
-x_1d = np.linspace(0, 2*np.pi, n, endpoint=False)  # Exclude endpoint to make the domain periodic
-y_1d = np.linspace(0, 2*np.pi, n, endpoint=False)
-x, y = np.meshgrid(x_1d, y_1d, indexing='ij')
 
-w0 = np.cos(3*y)*np.sin(x-1) + np.sin(2*x + y)*np.cos(y-2) + np.cos(4*x-1)*np.sin(y)
-forcing = 4*np.cos(4*y)
+if __name__ == "__main__":
+    # Define the number of points along x and y axes
+    n      = 64   # resolution
+    trials = 16   # number of initial conditions
+    dt     = 0.025
+    nu     = 1.0/40
 
-dt = 0.025
-nu = 1.0/40
-timesteps = 1024*32
+    timesteps = 1024 #overall per trial
+    transient = 512 #Don't save timesteps less than this
+    stride    = 4   #record every "stride" timesteps
 
-w = generate_traj(w0, dt, nu, forcing, timesteps)
+    amplitude = 10  #max vorticity value for initial data
 
-#Transform to streamfunction
-k = np.arange(0,n,1)
-bad = k>n/2
-k[bad] = k[bad] - n    
-kx = np.reshape( k, [n,1] )
-ky = np.reshape( k, [1,n] )
+    # Generate the x and y values in the range [0, 2*pi]
+    x_1d = np.linspace(0, 2*np.pi, n, endpoint=False)  # Exclude endpoint to make the domain periodic
+    y_1d = np.linspace(0, 2*np.pi, n, endpoint=False)
+    x, y = np.meshgrid(x_1d, y_1d, indexing='ij')
+    forcing = 4*np.cos(4*y)
 
-to_psi = 1.0/(kx*kx + ky*ky)
-to_psi[0,0] = 0 #get rid of infinity from 1/0
-to_psi = np.expand_dims( to_psi, 2 )
+    #allocate memory for all trials
+    ss = slice(transient, timesteps, stride) #subsampling index, cut off some of transient
+    ns = len(range(ss.start, ss.stop, ss.step)) #count the elements of ss
+    w  = np.zeros( (n,n,ns,trials) ) #store all trajectories here
 
-wf = np.fft.fft2(w, axes=(0, 1))
-psi = np.real( np.fft.ifft2(  to_psi * wf, axes=(0, 1) ) )
+    for tr in range(trials):
+        print(f"trial {tr} / {trials}")
+        w0 = random_initial_data(n, amplitude)
+        w[:,:,:,tr] = generate_traj(w0, dt, nu, forcing, timesteps)[:,:,ss]
 
-my_dict = {"psi": psi, "w": w, "x": x, "y": y, "to_psi": to_psi}
-savemat("w_traj.mat", my_dict)
+    my_dict = { "w": w, "x": x, "y": y }
+    savemat("w_traj.mat", my_dict)
