@@ -115,7 +115,7 @@ if __name__ == "__main__":
 
     timesteps = 1024 #overall per trial
     transient = 512 #Don't save timesteps less than this
-    stride    = 4   #record every "stride" timesteps
+    stride    = 8   #record every "stride" timesteps
 
     amplitude = 10  #max vorticity value for initial data
 

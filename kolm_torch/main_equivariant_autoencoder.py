@@ -7,9 +7,9 @@ from scipy.io import savemat, loadmat
 import numpy as np
 
 #Parameters
-batch_size = 256  #train on this many snapshots at a time
+batch_size = 64  #train on this many snapshots at a time
 num_epochs = 512
-lr = 0.0001
+lr = 0.001
 
 
 # Load data
@@ -55,8 +55,8 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         l_batch = network.encode(input)   #encode the state
 
-        drop = torch.nn.Dropout(p=0.2)
-        l_batch = drop(l_batch)
+        #drop = torch.nn.Dropout(p=0.2)
+        #l_batch = drop(l_batch)
 
         w_out   = network.decode(l_batch) #decode
 

@@ -75,40 +75,84 @@ class EquivariantLayer(nn.Module):
         f = torch.fft.irfft2(f,dim=[1,2])
         
         return f
-        
+
+
+class EquivariantDenseBlock(nn.Module):
+    '''
+    Inspired by "Densely Connected Convolutional Networks" by Huang et al.
+    '''
+    def __init__(self, n1, n2, c1, c2, num_layers, activation ):
+        '''
+        The goal of this block is to apply exactly translational equivariant convolutions, 
+        but in the style of a "DenseBlock" in the sense of Huang.
+
+        INPUT:
+        nl - number of layers. 
+        activation - activation function
+        '''
+        super().__init__()
+
+        self.activation = activation
+
+        layers = []
+        num_features = c1 #this will change
+        for i in range(num_layers-1):
+            layers.append( EquivariantLayer(num_features, c2, n1, n1) )
+            num_features = num_features + c2 #since we concat input with output
+
+        #At the last layer, change resolution
+        layers.append( EquivariantLayer(num_features, c2, n1, n2) )
+        self.layers = layers
+
+    def forward(self, x):
+        for layer in self.layers:
+            output = self.activation(layer(x))
+            x = torch.cat( (x,output), dim=3 )
+        return x
+
 class EquivariantAutoencoder(nn.Module):
     def __init__(self):
         super().__init__()
 
-        c = 8
+        c = 32
         #encoding layers
-        self.elayer1 = EquivariantLayer(c1=2,c2=c,n1=64,n2=32) # take in vorticity and force, so c1=2
-        self.elayer2 = EquivariantLayer(c1=c,c2=1,n1=32,n2=16)
-        self.elayer3 = EquivariantLayer(c1=c,c2=1,n1=16,n2=8)
+    
+        gelu = nn.GELU()
+
+        self.elayer1 = EquivariantDenseBlock(n1=64, n2=64, c1=2, c2=8, num_layers=4, activation=gelu) #EquivariantLayer(c1=2,c2=c,n1=64,n2=32) # take in vorticity and force, so c1=2
+        self.elayer2 = EquivariantLayer(c1=1,c2=c,n1=64,n2=16)
+        self.elayer3 = EquivariantLayer(c1=1,c2=1,n1=16,n2=8)
         
         #decoding layers
         self.dlayer1 = EquivariantLayer(c1=1,c2=c,n1= 8,n2=16)
-        self.dlayer2 = EquivariantLayer(c1=c,c2=c,n1=16,n2=32) 
-        self.dlayer3 = EquivariantLayer(c1=c,c2=1,n1=32,n2=64) 
+        self.dlayer2 = EquivariantLayer(c1=1,c2=c,n1=16,n2=32) 
+        self.dlayer3 = EquivariantLayer(c1=1,c2=1,n1=32,n2=64) 
         
     def encode(self, f):
         '''
         f[:,:,:,0] - vorticity
         f[:,:,:,1] - forcing
         '''
-        activation = lambda x: torch.cos(x)
-
+        #activation = lambda x: torch.cos(x)
+        activation = torch.nn.GELU()
+        
         f = activation(self.elayer1(f))
+        f = torch.mean(f,dim=3,keepdim=True)
         f = activation(self.elayer2(f))
+        f = torch.mean(f,dim=3,keepdim=True)
         f = activation(self.elayer3(f))
  
         return f
     
     def decode(self, f):
-        activation = lambda x: torch.cos(x)
+        activation = torch.nn.GELU()
 
         f = activation(self.dlayer1(f))
+        f = torch.mean(f,dim=3,keepdim=True)
+        #f = torch.max(f,dim=3,keepdim=True)[0]
         f = activation(self.dlayer2(f))
+        #f = torch.max(f,dim=3,keepdim=True)[0]
+        f = torch.mean(f,dim=3,keepdim=True)
         f =            self.dlayer3(f)
         #no activation to end decoding
 
