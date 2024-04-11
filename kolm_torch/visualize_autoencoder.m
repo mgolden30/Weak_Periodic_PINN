@@ -31,7 +31,7 @@ for t = 1:10:size(w,1)
   nexttile
   %plot( latent_space(i,:), 'o' );
   nice_imagesc( latent );
-  clim([0,1]);
+  clim([-1,1]);
   title("latent space coordinates");
 
   set(gcf, "color", "w");

@@ -7,10 +7,14 @@ from scipy.io import savemat, loadmat
 import numpy as np
 
 #Parameters
-batch_size = 64  #train on this many snapshots at a time
-num_epochs = 512
-lr = 0.001
+batch_size = 128  #train on this many snapshots at a time
+num_epochs = 256
+lr = 1e-2
 
+# Set PyTorch seed for reproducibility
+seed_value = 1234
+torch.manual_seed(seed_value)
+torch.cuda.manual_seed_all(seed_value)
 
 # Load data
 data = loadmat("w_traj.mat")
