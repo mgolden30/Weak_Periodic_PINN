@@ -26,19 +26,26 @@ colorbar();
 return
 %}
 
+%generate a colormap that is centered at zero
+clim([-1,1]);
+colormap bluewhitered
+
 for tr= 1:size(w,2)
 for t = 1:1:size(w,1)
-
+  
+  %Take this particular frame
   w_auto = squeeze( predictions(t,tr,:,:) );
   w_true = squeeze( w(t,tr,:,:) );
 
-  latent2 = squeeze(latent_space( t,tr,:,:,:) );
-  latent = [];
-  for i = 1:size(latent2,3)
-    latent = [latent, latent2(:,:,i)'];
+  %The latent space is more complicated
+  latent = squeeze(latent_space( t,tr,:,:,:) );
+  num_channels = size(latent,1);
+  l = [];
+  for i = 1:num_channels
+    l = [l, squeeze(latent(i,:,:))];
   end
 
-  tiledlayout(1,3);
+  tiledlayout(2,2);
   
   nexttile
   %w_true = log10(abs(fftshift(fft2(w_true))));
@@ -46,27 +53,32 @@ for t = 1:1:size(w,1)
   %clim([-10, -2])
   title("DNS $\omega$", "interpreter", "latex");
   
-  nexttile
-  %latent = abs(fftshift(fft2(latent))) 
-  nice_imagesc( latent );
-  clim([-1,1]*20);
-  title("latent space coordinates");
-  pbaspect([1,2,1])
-  yline(8.5, "linewidth", 3);
-
 
   nexttile
   %w_auto = log10(fftshift(abs(fft2(w_auto))));
   nice_imagesc( w_auto );
   %clim([-10, -2])
   rel_err = norm(w_true - w_auto)/norm(w_true);
-  title("autoencoder $\omega$, relative error = " + rel_err, "interpreter", "latex");
+  title_str = sprintf( "autoencoder $\\omega$, relative error = %.3f", rel_err);
+  title(title_str, "interpreter", "latex");
 
-  %{
+
+  nexttile
+  %latent = abs(fftshift(fft2(latent))) 
+  nice_imagesc( l );
+  clim([-1,1]*20);
+  title("latent space coordinates");
+  pbaspect([1,2,1])
+  yline(8.5, "linewidth", 3);
+
+  
+  
   nexttile
   nice_imagesc( w_true - w_auto );
+  title_str = sprintf( "difference relative error = %.3f", rel_err);
   title("difference", "interpreter", "latex");
-  %}
+  
+
 
   set(gcf, "color", "w");
 

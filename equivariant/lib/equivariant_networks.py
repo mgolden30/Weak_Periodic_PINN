@@ -8,6 +8,8 @@ import torch.nn as nn
 
 from lib.torch_dns import  navier_stokes_rk4
 
+device = "cpu"
+
 class SymmetryFactory():
     '''
     This class just provides functions for augmenting data via symmetry operations.
@@ -190,12 +192,12 @@ class EquivariantLayer(nn.Module):
         self.mask3 = torch.reshape( idx1-idx2 > 0, [-1] )
 
         #move all constant tensors onto gpu
-        device = "cuda"
+        #device = "cuda"
         self.kx       = self.kx.to(device)
         self.ky       = self.ky.to(device)
         self.to_u     = self.to_u.to(device)
         self.to_v     = self.to_v.to(device)
-        self.inv_k_sq = self.inv_k_sq.to("cuda")
+        self.inv_k_sq = self.inv_k_sq.to(device)
         self.mask     = self.mask.to(device)
         self.mask2    = self.mask2.to(device)
         self.mask3    = self.mask3.to(device)
@@ -266,7 +268,7 @@ class EquivariantLayer(nn.Module):
 
         #Torch hates multiple row Boolean indexing, so I have to do this insane work-around
         temp = f
-        device = "cuda"
+        #device = "cuda"
         f = torch.zeros( (b,c,self.n1,self.n2//2+1), dtype=torch.complex64 ).to(device)
         f[:,:,:,self.mask2] = temp
         
@@ -398,13 +400,10 @@ class EquivariantLayer(nn.Module):
 
 
 
-
-
-
 class EquivariantAutoencoder(nn.Module):
     def __init__(self, latent_c, enc_res, dec_res, enc_c, dec_c ):
         super().__init__()
-        device = "cuda"
+        #device = "cuda"
 
         ########################
         # Make encoding layers

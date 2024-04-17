@@ -4,7 +4,8 @@ from lib.equivariant_networks import EquivariantAutoencoder
 from scipy.io import loadmat, savemat
 import numpy as np
 
-device = "cuda"
+#device = "cuda"
+device = "cpu"
 
 # Load data
 data = loadmat("w_traj.mat")
@@ -44,7 +45,7 @@ dec_res = [ 8, 16, 32, 64] #decoder resolution sequence
 dec_c   = [lc, 32, 32, 32] #output conv channels 
 
 network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
-network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth"))
+network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth", map_location=torch.device('cpu')))
 network = network.to(device)
 
 # Create lists to store predictions and latent space values
@@ -52,6 +53,14 @@ predictions  = []
 latent_space = []
 
 print(w.shape) 
+
+#Make a minigrid
+gridm  = torch.linspace(0,2*torch.pi,steps=9)
+xm, ym = torch.meshgrid( gridm[0:8], gridm[0:8] )
+xm = torch.unsqueeze(xm,0)
+ym = torch.unsqueeze(ym,0)
+
+
 # Evaluate the model and store predictions and latent space values
 with torch.no_grad():
     for batch in dataloader:
@@ -61,6 +70,12 @@ with torch.no_grad():
         input = input.to(device)
 
         l_batch = network.encode(input)
+
+        #turn off all latent space
+        #l_batch = 0*l_batch
+        #l_batch[:,0,1,1] = 30
+        #l_batch[:,0,:,:] = 100*torch.cos(xm)
+        
         w_out   = network.decode(l_batch)
 
         #make sure these are the same shape
@@ -74,7 +89,7 @@ predictions  = np.concatenate(predictions, axis=0)
 latent_space = np.concatenate(latent_space, axis=0)
 
 predictions = predictions.reshape([nt,tr,n,n])
-latent_space = latent_space.reshape([nt,tr,8,8,-1])
+latent_space = latent_space.reshape([nt,tr,-1,8,8])
 w = w.reshape([nt,tr,n,n])
 
 print( predictions.shape )
