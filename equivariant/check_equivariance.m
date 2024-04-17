@@ -1,5 +1,5 @@
 clear;
-load("diff_rot.mat");
+load("diff_reflect.mat");
 
 c = 1;
 w1 = squeeze(o1(1,c,:,:));

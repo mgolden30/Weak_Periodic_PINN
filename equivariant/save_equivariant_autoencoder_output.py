@@ -4,6 +4,8 @@ from lib.equivariant_networks import EquivariantAutoencoder
 from scipy.io import loadmat, savemat
 import numpy as np
 
+device = "cuda"
+
 # Load data
 data = loadmat("w_traj.mat")
 w = torch.tensor(data["w"][:], dtype=torch.float32)
@@ -33,8 +35,17 @@ force = force.unsqueeze(1) #add channel index
 force = force.repeat((batch_size,1,1,1)) #repeat over batch dimension
 
 # Load trained models
-network = EquivariantAutoencoder()
-network.load_state_dict(torch.load("equivariant_autoencoder.pth"))
+
+
+lc = 2 #change to whatever you want
+enc_res = [64, 32, 16,  8] #encoder resolution sequence
+enc_c   = [ 2, 32, 32, 32] #output conv channels
+dec_res = [ 8, 16, 32, 64] #decoder resolution sequence
+dec_c   = [lc, 32, 32, 32] #output conv channels 
+
+network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
+network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth"))
+network = network.to(device)
 
 # Create lists to store predictions and latent space values
 predictions  = []
@@ -47,9 +58,10 @@ with torch.no_grad():
         w_batch = batch[0].unsqueeze(1) #add a channel index
         input   = torch.cat( (w_batch, force), dim=1 ) #stack over channel
 
-        l_batch = network.encode(input)   #encode the state
+        input = input.to(device)
 
-        w_out   = network.decode(l_batch) #decode
+        l_batch = network.encode(input)
+        w_out   = network.decode(l_batch)
 
         #make sure these are the same shape
         w_out = torch.reshape(w_out, w_batch.shape )

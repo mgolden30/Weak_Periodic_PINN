@@ -27,11 +27,11 @@ state = [to_vec(w); u0];
 
 %%
 clf;
-load("ECS\REQ2.mat");
+load("ECS\EQ1.mat");
 
 damp  = 1;
-maxit = 128;
-inner = 32;
+maxit = 1;
+inner = 1;
 outer = 1;
 tol   = 1e-2; 
 

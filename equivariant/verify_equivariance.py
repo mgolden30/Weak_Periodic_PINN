@@ -36,7 +36,7 @@ input = torch.cat( (w_batch, force), dim=1 )
 
 
 network = EquivariantAutoencoder()
-#network.load_state_dict(torch.load("equivariant_autoencoder.pth"))
+network.load_state_dict(torch.load("equivariant_autoencoder.pth"))
 
 symm = SymmetryFactory()
 
@@ -117,7 +117,7 @@ print( f"Difference is {diff_sh}")
 ###########################
 # Relfection symmetry!
 ###########################
-print("\nChecking for equivariance of translations")
+print("\nChecking for equivariance of reflections")
 
 #Don;t forget to change sign after transpose!!!
 input_tr  = -symm.transpose(input)

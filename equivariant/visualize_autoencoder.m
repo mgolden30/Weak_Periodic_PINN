@@ -8,11 +8,23 @@ colorbar();
 return
 %}
 
- vidObj = VideoWriter('autoenc.avi');
- open(vidObj);
+vidObj = VideoWriter('autoenc.avi');
+vidObj.FrameRate = 10;
+open(vidObj);
 
 clf
 colormap jet
+
+mean_true = mean( w.^2,[3,4] );
+mean_auto = mean( predictions, [3,4] );
+
+
+%{
+clf
+imagesc(mean_auto)
+colorbar();
+return
+%}
 
 for tr= 1:size(w,2)
 for t = 1:1:size(w,1)
@@ -20,7 +32,11 @@ for t = 1:1:size(w,1)
   w_auto = squeeze( predictions(t,tr,:,:) );
   w_true = squeeze( w(t,tr,:,:) );
 
-  latent = squeeze(latent_space( t,tr,:,:) );
+  latent2 = squeeze(latent_space( t,tr,:,:,:) );
+  latent = [];
+  for i = 1:size(latent2,3)
+    latent = [latent, latent2(:,:,i)'];
+  end
 
   tiledlayout(1,3);
   
@@ -33,15 +49,18 @@ for t = 1:1:size(w,1)
   nexttile
   %latent = abs(fftshift(fft2(latent))) 
   nice_imagesc( latent );
-  clim([-1,1]*1e2);
+  clim([-1,1]*20);
   title("latent space coordinates");
+  pbaspect([1,2,1])
+  yline(8.5, "linewidth", 3);
 
 
   nexttile
   %w_auto = log10(fftshift(abs(fft2(w_auto))));
   nice_imagesc( w_auto );
   %clim([-10, -2])
-  title("autoencoder $\omega$", "interpreter", "latex");
+  rel_err = norm(w_true - w_auto)/norm(w_true);
+  title("autoencoder $\omega$, relative error = " + rel_err, "interpreter", "latex");
 
   %{
   nexttile
