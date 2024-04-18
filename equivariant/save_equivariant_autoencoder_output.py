@@ -4,8 +4,8 @@ from lib.equivariant_networks import EquivariantAutoencoder
 from scipy.io import loadmat, savemat
 import numpy as np
 
-#device = "cuda"
-device = "cpu"
+device = "cuda"
+#device = "cpu"
 
 # Load data
 data = loadmat("w_traj.mat")

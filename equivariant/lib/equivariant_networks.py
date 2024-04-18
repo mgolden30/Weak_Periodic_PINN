@@ -8,7 +8,7 @@ import torch.nn as nn
 
 from lib.torch_dns import  navier_stokes_rk4
 
-device = "cpu"
+device = "cuda"
 
 class SymmetryFactory():
     '''
