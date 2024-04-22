@@ -203,7 +203,6 @@ class EquivariantLayer(nn.Module):
         self.mask3    = self.mask3.to(device)
 
 
-
     def symmetric_kernel(self):
         '''
         Symmetrize the kernel with respect to D4, the symmetry group of a square
@@ -229,7 +228,9 @@ class EquivariantLayer(nn.Module):
         #take the group invariant mean
         k = (k1 + k2 + k3 + k4 + k5 + k6 + k7 + k8)/8
         return k
-    
+
+
+
     def downsample(self, f):
         '''
         Reduce the spatial resolution by using a truncated Fourier series
@@ -244,7 +245,7 @@ class EquivariantLayer(nn.Module):
         f = f[:,:,         :,self.mask2]
 
         #renormalize
-        f = f * self.n2 / self.n1
+        f = f * (self.n2 / self.n1)**2
 
         return f
 
@@ -279,12 +280,13 @@ class EquivariantLayer(nn.Module):
         f[:,:,self.mask,:] = temp
 
         #renormalize
-        f = f * self.n2 / self.n1
+        f = f * (self.n2 / self.n1)**2
 
         return f
 
     def local_activation( self, f ):
         #A local, equivariant activation that is lightly "physics-informed"
+        '''
         f    = torch.fft.rfft2(f)
         u = self.to_u * f 
         v = self.to_v * f
@@ -302,13 +304,38 @@ class EquivariantLayer(nn.Module):
         v = torch.fft.irfft2(v)
         p = torch.fft.irfft2(p)
         f = torch.fft.irfft2(f)
-        
+        '''
         sig = nn.Sigmoid()
 
-        arg = self.c_wsq*f*f + self.c_usq*(u*u+v*v) + self.c_p*p - self.bias
+        arg = self.c_wsq*f*f  - self.bias #+ self.c_usq*(u*u+v*v) + self.c_p*p - self.bias
         f = f*sig( arg )
         return f
 
+    def genetic_activation(self,f):
+        '''
+        Use a physics-informed activation
+        '''
+        #f = torch.fft.rfft2(f)
+        u = torch.fft.irfft2( f*self.to_u ) #x component of velocity
+        v = torch.fft.irfft2( f*self.to_v ) #y component of velocity
+
+        #both components are of size [b,c2,n,n]
+        u = torch.unsqueeze(u, dim=1)
+        v = torch.unsqueeze(v, dim=2)
+        w = u*v
+        w = w - torch.transpose(w, 1, 2)
+        w = w.flatten(1,2) #combine these two dimensions
+        
+        #compute a mask to take the unique
+        k = torch.arange(self.c2)
+        d = torch.unsqueeze(k,dim=0) - torch.unsqueeze(k,dim=1)
+        d = d.flatten()
+        d = d>0
+        #print(w.shape)
+        w = w[:,d,:,:]
+        #print(w.shape)
+        return w
+    
     def burgers_activation(self,f):
         '''
         Filling out the Fourier-spectrum is hard when upsampling and activating. What if we used a cheap
@@ -398,7 +425,30 @@ class EquivariantLayer(nn.Module):
         conv = torch.fft.irfft2(conv)
         return f, conv
 
+    def forward2(self, f ):
+        # Perform a convolution and change resolution of input f
 
+        f  = torch.fft.rfft2( f )
+        #Do downsampling if needed
+        if self.n2 < self.n1:
+            f = self.downsample(f)
+
+        #output is in Fourier space
+        conv = self.convolution( f )
+
+        #Do upsampling if needed
+        if self.n2 > self.n1:
+            conv = self.upsample(conv)
+            f    = self.upsample(f)
+
+        #Compute the children velocity fields
+        w = self.genetic_activation(conv)
+
+        f = torch.fft.irfft2(f)
+        return torch.cat( (f, w), dim=1 )
+
+    def output_dim(self):
+        return self.c1 + (self.c2*(self.c2-1))//2
 
 class EquivariantAutoencoder(nn.Module):
     def __init__(self, latent_c, enc_res, dec_res, enc_c, dec_c ):
@@ -413,7 +463,7 @@ class EquivariantAutoencoder(nn.Module):
         for i in range(len(enc_res)-1):        
             layer = EquivariantLayer( c1=c, c2=enc_c[i+1], n1=enc_res[i], n2=enc_res[i+1] ).to(device)
             self.add_module(f"enc_{i}", layer) #keep track of weights!
-            c = c + enc_c[i+1] #since skip connection
+            c = layer.output_dim() #since skip connection
             enc.append(layer)
         self.enc = enc
         #A linear layer to go to latent_c
@@ -428,7 +478,7 @@ class EquivariantAutoencoder(nn.Module):
         for i in range(len(dec_res)-1):        
             layer = EquivariantLayer( c1=c, c2=dec_c[i+1], n1=dec_res[i], n2=dec_res[i+1] ).to(device)
             self.add_module(f"dec_{i}", layer)
-            c = c + dec_c[i+1] #since skip connection
+            c = layer.output_dim() #since skip connection
             dec.append(layer)
         self.dec = dec
         #A linear layer to go to vorticity
@@ -447,13 +497,14 @@ class EquivariantAutoencoder(nn.Module):
         for i in range( len(self.enc) ):
             #Apply convolutional layer
             #Take the input back as well since the layer will upsample/downsample as needed!
-            input, output = self.enc[i](input)
+            #input, output = self.enc[i](input)
             #Apply nonlinear activation 
-            output = self.enc[i].local_activation(output)
+            #output = self.enc[i].local_activation(output)
             #Dropout to prevent overfitting
-            output = drop(output)
+            #output = drop(output)
             #Add skip connection (append input to output)
-            input = torch.cat( (input, output), dim=1 )
+            #input = torch.cat( (input, output), dim=1 )
+            input = self.enc[i].forward2(input)
 
         #After all of that, apply a linear layer to channels
         #f is [b,c,n,n]. Need to swap c to the end
@@ -471,18 +522,20 @@ class EquivariantAutoencoder(nn.Module):
         for i in range( len(self.dec) ):
             #Apply convolutional layer
             #Take the input back as well since the layer will upsample/downsample as needed!
-            input, output = self.dec[i](input)
+            #input, output = self.dec[i](input)
             #Apply nonlinear activation 
-            output = self.dec[i].local_activation(output)
+            #output = self.dec[i].local_activation(output)
             #output = self.dec[i].burgers_activation(output)
             #if i == (len(self.dec)-1):
                 #last layer
                 #output = self.dec[i].euler_step(output)
 
             #Apply dropout to prevent overfitting
-            output = drop(output)
+            #output = drop(output)
             #Add skip connection (append input to output)
-            input = torch.cat( (input, output), dim=1 )
+            #input = torch.cat( (input, output), dim=1 )
+            input = self.dec[i].forward2(input)
+
 
         #After all of that, apply a linear layer to channels
         #f is [b,c,n,n]. Need to swap c to the end

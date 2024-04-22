@@ -6,7 +6,6 @@ import sys
 print(sys.version)
 print(torch.__version__)
 
-
 device = "cuda"
 
 # Set PyTorch seed for reproducibility
@@ -43,10 +42,11 @@ input = torch.cat( (w_batch, force), dim=1 )
 input = input.to(device)
 
 lc = 2 #change to whatever you want
+ch = 4
 enc_res = [64, 32, 16,  8] #encoder resolution sequence
-enc_c   = [ 2, 32, 32, 32] #output conv channels
+enc_c   = [ 2, ch, ch, ch] #output conv channels
 dec_res = [ 8, 16, 32, 64] #decoder resolution sequence
-dec_c   = [lc, 32, 32, 32] #output conv channels 
+dec_c   = [lc, ch, ch, ch] #output conv channels 
 
 network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
 network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth", map_location=torch.device('cpu')))
@@ -141,6 +141,25 @@ output1 = output1.cpu().detach()
 output2 = output2.cpu().detach()
 my_dict = {"o1": output1, "o2": output2}
 savemat( "diff_reflect.mat", my_dict )
+
+diff_tr = torch.mean( torch.abs(output1 - output2), dim=[0,1,2,3] )
+print( f"Difference is {diff_tr}")
+
+
+###########################
+# Relfection symmetry (WRONG)
+###########################
+print("\nChecking for equivariance of reflections")
+
+#Don;t forget to change sign after transpose!!!
+input_tr  = symm.transpose(input)
+output1   = network.decode(network.encode(input_tr))
+output2   = symm.transpose(network.decode(network.encode(input)))
+
+output1 = output1.cpu().detach()
+output2 = output2.cpu().detach()
+my_dict = {"o1": output1, "o2": output2}
+savemat( "diff_reflect2.mat", my_dict )
 
 diff_tr = torch.mean( torch.abs(output1 - output2), dim=[0,1,2,3] )
 print( f"Difference is {diff_tr}")

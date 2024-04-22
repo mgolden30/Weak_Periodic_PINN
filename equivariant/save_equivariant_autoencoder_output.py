@@ -37,12 +37,12 @@ force = force.repeat((batch_size,1,1,1)) #repeat over batch dimension
 
 # Load trained models
 
-
 lc = 2 #change to whatever you want
+ch = 4
 enc_res = [64, 32, 16,  8] #encoder resolution sequence
-enc_c   = [ 2, 32, 32, 32] #output conv channels
+enc_c   = [ 2, ch, ch, ch] #output conv channels
 dec_res = [ 8, 16, 32, 64] #decoder resolution sequence
-dec_c   = [lc, 32, 32, 32] #output conv channels 
+dec_c   = [lc, ch, ch, ch] #output conv channels 
 
 network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
 network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth", map_location=torch.device('cpu')))

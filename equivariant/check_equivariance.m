@@ -1,6 +1,6 @@
 clear;
 
-str = "diff_trans"
+str = "diff_reflect";
 
 load( str  + ".mat");
 out_name = str + ".png";
@@ -26,7 +26,7 @@ axis square
 
 nexttile
 diff = w1-w2;
-%diff = fftshift(fft2(diff));
+diff = fftshift(fft2(diff));
 diff = abs(diff);
 nice_imagesc( diff )
 title(sprintf("difference: max(abs(diff)) = %.2e", max(max(abs(diff)))));
