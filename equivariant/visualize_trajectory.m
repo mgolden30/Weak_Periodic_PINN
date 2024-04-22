@@ -20,7 +20,7 @@ w2 = real(ifft2(w2));
 
 MSE = mean( (w - w2).^2, 'all' )
 for tr= 1:size(w,4)
-for t = 1:size(w,3)
+for t = 1:16:size(w,3)
   
   tiledlayout(1,3);
 

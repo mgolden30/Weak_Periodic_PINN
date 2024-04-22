@@ -109,13 +109,13 @@ def generate_traj(w0, dt, nu, forcing, timesteps):
 if __name__ == "__main__":
     # Define the number of points along x and y axes
     n      = 64   # resolution
-    trials = 32   # number of initial conditions
+    trials = 64   # number of initial conditions
     dt     = 0.025
     nu     = 1.0/40
 
-    timesteps = 1024*2 #overall per trial
-    transient = 1024 #Don't save timesteps less than this
-    stride    = 32   #record every "stride" timesteps
+    timesteps = 1024*4 #overall per trial
+    transient = 1024*2 #Don't save timesteps less than this
+    stride    = 16     #record every "stride" timesteps
 
     amplitude = 10  #max vorticity value for initial data
 

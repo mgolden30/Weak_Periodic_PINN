@@ -30,6 +30,8 @@ return
 clim([-1,1]);
 colormap bluewhitered
 
+latent_std = std( latent_space, 0 ,"all"  );
+
 for tr= 1:size(w,2)
 for t = 1:1:size(w,1)
   
@@ -66,7 +68,7 @@ for t = 1:1:size(w,1)
   nexttile
   %latent = abs(fftshift(fft2(latent))) 
   nice_imagesc( l );
-  clim([-1,1]*20);
+  clim([-1,1] * latent_std);
   title("latent space coordinates");
   pbaspect([1,2,1])
   yline(8.5, "linewidth", 3);

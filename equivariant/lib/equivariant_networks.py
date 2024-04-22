@@ -443,6 +443,8 @@ class EquivariantLayer(nn.Module):
 
         #Compute the children velocity fields
         w = self.genetic_activation(conv)
+        #Apply a nonlinear function to w to keep the values reasonable
+        w = torch.tanh(w)
 
         f = torch.fft.irfft2(f)
         return torch.cat( (f, w), dim=1 )
@@ -468,6 +470,7 @@ class EquivariantAutoencoder(nn.Module):
         self.enc = enc
         #A linear layer to go to latent_c
         self.elin = nn.Linear(c, latent_c, bias=False)
+        print(f"Linear layer {c} -> {latent_c}")
         self.elin = self.custom_init(self.elin)
 
         ########################
@@ -483,6 +486,7 @@ class EquivariantAutoencoder(nn.Module):
         self.dec = dec
         #A linear layer to go to vorticity
         self.dlin = nn.Linear(c, 1, bias=False)
+        print(f"Linear layer {c} -> 1")
         self.dlin = self.custom_init(self.dlin)
 
     def custom_init(self, m):

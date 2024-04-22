@@ -46,7 +46,7 @@ dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 # Define autoencoder
 ##############################
 lc = 2 #change to whatever you want
-ch = 4
+ch = 8
 enc_res = [64, 32, 16,  8] #encoder resolution sequence
 enc_c   = [ 2, ch, ch, ch] #output conv channels
 dec_res = [ 8, 16, 32, 64] #decoder resolution sequence
