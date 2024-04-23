@@ -443,8 +443,10 @@ class EquivariantLayer(nn.Module):
 
         #Compute the children velocity fields
         w = self.genetic_activation(conv)
-        #Apply a nonlinear function to w to keep the values reasonable
+        #Apply an odd function to w to keep the values reasonable
         w = torch.tanh(w)
+        #w = w*torch.exp(-torch.square(w))
+        #w = w/( 1 + w*w )
 
         f = torch.fft.irfft2(f)
         return torch.cat( (f, w), dim=1 )

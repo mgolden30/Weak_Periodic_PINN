@@ -9,9 +9,9 @@ import numpy as np
 device = "cuda"
 
 #Parameters
-batch_size =  128  #train on this many snapshots at a time
-num_epochs =   64
-lr = 1e-3
+batch_size =  256  #train on this many snapshots at a time
+num_epochs =  256
+lr = 1e-6
 
 # Set PyTorch seed for reproducibility
 seed_value = 123
@@ -46,7 +46,7 @@ dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 # Define autoencoder
 ##############################
 lc = 2 #change to whatever you want
-ch = 8
+ch = 16
 enc_res = [64, 32, 16,  8] #encoder resolution sequence
 enc_c   = [ 2, ch, ch, ch] #output conv channels
 dec_res = [ 8, 16, 32, 64] #decoder resolution sequence
@@ -54,7 +54,7 @@ dec_c   = [lc, ch, ch, ch] #output conv channels
 
 dropout = 0 #to avoid overfitting
 network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
-#network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth"))
+network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth"))
 
 
 #Send everything to the GPU
