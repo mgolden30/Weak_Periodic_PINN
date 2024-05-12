@@ -1,5 +1,6 @@
 import torch as torch
-from lib.equivariant_networks import SymmetryFactory, EquivariantAutoencoder
+from lib.equivariant_networks import SymmetryFactory
+from lib.EquivariantAutoencoder import EquivariantAutoencoder
 from scipy.io import loadmat, savemat
 
 import sys
@@ -52,6 +53,9 @@ network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
 network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth", map_location=torch.device('cpu')))
 network = network.to(device)
 
+#Save the learned timesteps for the Euler activation
+#network.save_dt()
+
 symm = SymmetryFactory()
 
 
@@ -86,16 +90,17 @@ print("\nChecking for equivariance of 90 degree rotations")
 output1 = network.decode(network.encode(symm.rot90(input)))
 output2 = symm.rot90(network.decode(network.encode(input)))
 
-print(f"Shape of output is {output1.shape}")
+#print(f"Shape of output is {output1.shape}")
 
 mean1 = torch.mean( torch.abs(output1), dim=[0,2,3] )
 mean2 = torch.mean( torch.abs(output2), dim=[0,2,3] )
 
 diff90 = torch.mean( torch.abs(output1 - output2), dim=[0,2,3] )
 
-print(f"mean of network(rot90()) is {mean1}")
-print(f"mean of rot90(network()) is {mean2}")
-print(f"mean of difference       is {diff90}")
+#print(f"mean of network(rot90()) is {mean1}")
+#print(f"mean of rot90(network()) is {mean2}")
+#print(f"mean of difference       is {diff90}")
+print( f"Difference is {diff90.cpu().detach().numpy()[0]}")
 
 output1 = output1.cpu().detach()
 output2 = output2.cpu().detach()
@@ -127,6 +132,8 @@ savemat( "diff_trans.mat", my_dict )
 diff_sh = torch.mean( torch.abs(output1 - output2), dim=[0,1,2,3] )
 print( f"Difference is {diff_sh}")
 
+
+
 ###########################
 # Relfection symmetry!
 ###########################
@@ -149,9 +156,9 @@ print( f"Difference is {diff_tr}")
 ###########################
 # Relfection symmetry (WRONG)
 ###########################
-print("\nChecking for equivariance of reflections")
+print("\nChecking for equivariance of unphysical reflections")
 
-#Don;t forget to change sign after transpose!!!
+#Purposely forget to change sign after transpose!!!
 input_tr  = symm.transpose(input)
 output1   = network.decode(network.encode(input_tr))
 output2   = symm.transpose(network.decode(network.encode(input)))

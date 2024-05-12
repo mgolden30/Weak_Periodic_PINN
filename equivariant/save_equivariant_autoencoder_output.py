@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from lib.equivariant_networks import EquivariantAutoencoder
+from lib.EquivariantAutoencoder import EquivariantAutoencoder
 from scipy.io import loadmat, savemat
 import numpy as np
 
@@ -13,17 +13,16 @@ w = torch.tensor(data["w"][:], dtype=torch.float32)
 x = torch.tensor(data["x"], dtype=torch.float32)
 y = torch.tensor(data["y"], dtype=torch.float32)
 
-batch_size = 8
+batch_size = 128
 
 #w is saved as [n,n,nt,tr] where n is grid resolution, nt is timepoints, tr is number of trials
-#For training, combine the last two dimensions, but do not forget them!
-nt = w.shape[2]
-tr = w.shape[3]
-n  = w.shape[0]
-w  = torch.reshape( w, [n,n,-1] )
+#For training, combine the first two dimensions, but do not forget them!
+nt = w.shape[0]
+tr = w.shape[1]
+n  = w.shape[2]
+w  = torch.reshape( w, [-1,n,n] )
 
-# Permute dimensions for training [n,n,b] -> [b,n,n]
-w = w.permute(2, 0, 1)
+
 
 # Define dataset and dataloader
 dataset = TensorDataset(w)
@@ -38,14 +37,16 @@ force = force.repeat((batch_size,1,1,1)) #repeat over batch dimension
 # Load trained models
 
 lc = 2 #change to whatever you want
-ch = 8
+ch = 16
 enc_res = [64, 32, 16,  8] #encoder resolution sequence
 enc_c   = [ 2, ch, ch, ch] #output conv channels
 dec_res = [ 8, 16, 32, 64] #decoder resolution sequence
 dec_c   = [lc, ch, ch, ch] #output conv channels 
 
 network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
-network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth", map_location=torch.device('cpu')))
+#network.load_state_dict(torch.load(f"ch_scaling/8.pth", map_location=torch.device('cpu')))
+network.load_state_dict(torch.load(f"models/model_32.pth", map_location=torch.device('cpu')))
+
 network = network.to(device)
 
 # Create lists to store predictions and latent space values
@@ -69,14 +70,8 @@ with torch.no_grad():
 
         input = input.to(device)
 
-        l_batch = network.encode(input)
-
-        #turn off all latent space
-        #l_batch = 0*l_batch
-        #l_batch[:,0,1,1] = 30
-        #l_batch[:,0,:,:] = 100*torch.cos(xm)
-        
-        w_out   = network.decode(l_batch)
+        l_batch, _ = network.encode(input,  v=input)
+        w_out, _   = network.decode(l_batch, v=l_batch)
 
         #make sure these are the same shape
         w_out = torch.reshape(w_out, w_batch.shape )

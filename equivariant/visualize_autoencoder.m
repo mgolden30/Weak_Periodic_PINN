@@ -1,19 +1,13 @@
 clear;
 load("equivariant_predictions.mat");
 
-%{
-mean_w = mean(predictions, [3,4]);
-imagesc(mean_w)
-colorbar();
-return
-%}
+
 
 vidObj = VideoWriter('autoenc.avi');
-vidObj.FrameRate = 10;
+vidObj.FrameRate = 4;
 open(vidObj);
 
 clf
-colormap jet
 
 mean_true = mean( w.^2,[3,4] );
 mean_auto = mean( predictions, [3,4] );
@@ -32,8 +26,8 @@ colormap bluewhitered
 
 latent_std = std( latent_space, 0 ,"all"  );
 
-for tr= 1:size(w,2)
-for t = 1:1:size(w,1)
+for t = 1:1:16%size(w,1)
+for tr= 1:4:size(w,2)
   
   %Take this particular frame
   w_auto = squeeze( predictions(t,tr,:,:) );
@@ -68,7 +62,7 @@ for t = 1:1:size(w,1)
   nexttile
   %latent = abs(fftshift(fft2(latent))) 
   nice_imagesc( l );
-  clim([-1,1] * latent_std);
+  clim([-1,1] * latent_std*2);
   title("latent space coordinates");
   pbaspect([1,2,1])
   yline(8.5, "linewidth", 3);
