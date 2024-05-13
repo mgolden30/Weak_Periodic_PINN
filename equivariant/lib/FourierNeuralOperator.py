@@ -10,7 +10,8 @@ from lib.SymmetryFactory import SymmetryFactory
 
 from scipy.io import savemat
 
-device = "cuda"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 
 class FourierNeuralOperator(nn.Module):
@@ -89,11 +90,11 @@ class FourierNeuralOperator(nn.Module):
         return k
 
 
-
     def downsample(self, f):
         '''
-        Reduce the spatial resolution by using a truncated Fourier series
+        Reduce the spatial resolution by truncating a Fourier series
         '''
+
         #There is care needed in handling the Nyquist frequency for maintaining equivariance. 
         #Rather than express that care, Let's just kill it completely.
         f[:,:,self.nyquist_pos,:]  = 0 * f[:,:,self.nyquist_pos,:]

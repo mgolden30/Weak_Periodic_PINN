@@ -1,32 +1,30 @@
+'''
+The purpose of this script is to check that what I am doing is actually group equivariant
+'''
+
 import torch as torch
-from lib.equivariant_networks import SymmetryFactory
+from lib.SymmetryFactory import SymmetryFactory
 from lib.EquivariantAutoencoder import EquivariantAutoencoder
 from scipy.io import loadmat, savemat
 
-import sys
-print(sys.version)
-print(torch.__version__)
+import lib.utils as ut
 
-device = "cuda"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # Set PyTorch seed for reproducibility
 seed_value = 123
 torch.manual_seed(seed_value)
 torch.cuda.manual_seed_all(seed_value)
 
-# Load data
-data = loadmat("w_traj.mat")
-w = torch.tensor(data["w"], dtype=torch.float32)
-x = torch.tensor(data["x"], dtype=torch.float32)
-y = torch.tensor(data["y"], dtype=torch.float32)
+
+#Load training data
+x, y, w = ut.load_vorticity_data()
 
 #w is saved as [n,n,nt,tr] where n is grid resolution, nt is timepoints, tr is number of trials
 #For our purposes, we can combint nt and tr
-n = w.shape[0]
-w = torch.reshape( w, [n,n,-1] )
-
-# Permute dimensions for training [n,n,b] -> [b,n,n]
-w = w.permute(2, 0, 1)
+n = w.shape[-1]
+w = torch.reshape( w, [-1,n,n] )
 
 batch = 12
 
@@ -39,46 +37,46 @@ force = force.repeat((batch,1,1,1)) #repeat over batch dimension
 w_batch = w[0:batch, :, :]
 w_batch = w_batch.unsqueeze(1)
 
+print( w_batch.shape )
+print( force.shape   )
+
 input = torch.cat( (w_batch, force), dim=1 )
 input = input.to(device)
 
-lc = 2 #change to whatever you want
-ch = 8
-enc_res = [64, 32, 16,  8] #encoder resolution sequence
-enc_c   = [ 2, ch, ch, ch] #output conv channels
-dec_res = [ 8, 16, 32, 64] #decoder resolution sequence
-dec_c   = [lc, ch, ch, ch] #output conv channels 
+
+##############################
+# Define autoencoder
+##############################
+lc = 10 #Number of latent images
+ch =  4
+enc_res = [ 64, 32, 16,  8,  4,  2 ] # encoder resolution sequence
+enc_c   = [  2, ch, ch, ch, ch, ch ] # output conv channels
+dec_res = [  2,  4,  8, 16, 32, 64 ] # decoder resolution sequence
+dec_c   = [ lc, ch, ch, ch, ch, ch ] # output conv channels 
 
 network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
-network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth", map_location=torch.device('cpu')))
+#network.load_state_dict(torch.load("gpu_equivariant_autoencoder.pth", map_location=torch.device('cpu')))
 network = network.to(device)
-
-#Save the learned timesteps for the Euler activation
-#network.save_dt()
 
 symm = SymmetryFactory()
 
+###########################################################
+# Check that at all levels, the mean of each field is zero
+###########################################################
 
-##################################
-# Does rotation by 90 degrees four times return the original?
-##################################
+latent, _ = network.encode(input)
+output, _ = network.decode(latent)
 
-i1 = symm.rot90_kernel(input)
-i2 = symm.rot90_kernel(i1)
-i3 = symm.rot90_kernel(i2)
-i4 = symm.rot90_kernel(i3)
+def check_mean( field, name ):
+    mean  = torch.mean( field, dim=[1,2] )
+    bound = torch.max(torch.abs(mean))
+    print(f"The mean of {name} is bounded by {bound}")
 
-print("\nChecking properties of rot90_kernel")
-
-print( f"mean error after 1 rotations is {torch.mean(torch.abs(input-i1),dim=[0,1,2,3])}" )
-print( f"mean error after 2 rotations is {torch.mean(torch.abs(input-i2),dim=[0,1,2,3])}" )
-print( f"mean error after 3 rotations is {torch.mean(torch.abs(input-i3),dim=[0,1,2,3])}" )
-print( f"mean error after 4 rotations is {torch.mean(torch.abs(input-i4),dim=[0,1,2,3])}" )
-
-inv = (input + i1 + i2 + i3)/4
-inv_rot = symm.rot90_kernel(inv)
-print( f"mean of invariant is {torch.mean(torch.abs(inv),dim=[0,1,2,3])}" )
-print( f"mean change in invariant {torch.mean(torch.abs(inv-inv_rot),dim=[0,1,2,3])}" )
+print("Checking that mean vorticity is zero in all channels")
+check_mean( input,  "input"  )
+check_mean( latent, "latent" )
+check_mean( output, "output" )
+print("\n\n")
 
 
 ###################################
@@ -90,16 +88,11 @@ print("\nChecking for equivariance of 90 degree rotations")
 output1 = network.decode(network.encode(symm.rot90(input)))
 output2 = symm.rot90(network.decode(network.encode(input)))
 
-#print(f"Shape of output is {output1.shape}")
-
 mean1 = torch.mean( torch.abs(output1), dim=[0,2,3] )
 mean2 = torch.mean( torch.abs(output2), dim=[0,2,3] )
 
 diff90 = torch.mean( torch.abs(output1 - output2), dim=[0,2,3] )
 
-#print(f"mean of network(rot90()) is {mean1}")
-#print(f"mean of rot90(network()) is {mean2}")
-#print(f"mean of difference       is {diff90}")
 print( f"Difference is {diff90.cpu().detach().numpy()[0]}")
 
 output1 = output1.cpu().detach()

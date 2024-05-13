@@ -63,7 +63,7 @@ def random_initial_conditions(n, amplitude, batch):
     return w
 
 
-def time_deriv( w, nu, forcing ):
+def time_deriv( w, nu, forcing, geometric=False ):
     '''
     PURPOSE:
     w - a [...,n,n] matrix representing a set of vorticity fields. 
@@ -97,17 +97,26 @@ def time_deriv( w, nu, forcing ):
     rhs = -(u*wx + v*wy) + nu*lap + forcing 
     rhs = dealias(rhs)
 
+    if geometric:
+        #If the geometric flag is turned on, it means we want to normalize the L2 norm of the time derivative
+        #This is a regularization in time and makes the integration have the same path, but with a different "time"
+        #This is fine for generating data, but not for forward time integration (unless you compute the transformation back to physical time)
+
+        #I want the mean of rhs^2 to be 1
+        scale = torch.mean( rhs*rhs, dim=[1,2], keepdim=True )
+        rhs = rhs / torch.sqrt( scale )
+
     #Restore the batch dimensions
     rhs = torch.unflatten( rhs, 0, batch_shape )
 
     return rhs
 
 
-def rk4_step(w, dt, nu, forcing):
-    k1 = time_deriv(w,           nu, forcing)
-    k2 = time_deriv(w + dt*k1/2, nu, forcing)
-    k3 = time_deriv(w + dt*k2/2, nu, forcing)
-    k4 = time_deriv(w + dt*k3,   nu, forcing)
+def rk4_step(w, dt, nu, forcing, geometric=False):
+    k1 = time_deriv(w,           nu, forcing, geometric=geometric)
+    k2 = time_deriv(w + dt*k1/2, nu, forcing, geometric=geometric)
+    k3 = time_deriv(w + dt*k2/2, nu, forcing, geometric=geometric)
+    k4 = time_deriv(w + dt*k3,   nu, forcing, geometric=geometric)
     
     return w + (k1 + 2*k2 + 2*k3 + k4)*dt/6
 
@@ -138,7 +147,7 @@ if __name__ == "__main__":
     
     t_vis      = 1.0/(16*nu) #viscous timescale 1/k^2/nu assuming dominant k=4 wavenumber
     transient  = 10*t_vis   #integrate this far forward before recording data
-    stride     = 8    #record every "stride" timesteps
+    stride     = 8       #record every "stride" timesteps
     amplitude  = 10   #typical vorticity value for initial data
 
     trans_step = round( transient/dt )
@@ -165,7 +174,7 @@ if __name__ == "__main__":
         print(f"{i}/{num_outputs}")
         w[:,i,:,:] = w0
         for j in np.arange(stride):
-            w0 = rk4_step( w0, dt, nu, forcing )
+            w0 = rk4_step( w0, dt, nu, forcing, geometric=True )
 
     my_dict = { "w": w, "x": x, "y": y }
     savemat("w_traj.mat", my_dict)

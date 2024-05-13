@@ -10,13 +10,14 @@ from lib.dns import time_deriv
 import lib.utils as ut
 
 #set device as "cuda" or "cpu"
-device = "cuda"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 #Parameters
 batch_size =  256
 num_epochs =  64
 lr = 1e-3
-dropout = 0*0.125 #to avoid overfitting
+dropout = 0 #to avoid overfitting
 
 # Define loss function (e.g., mean squared error)
 criterion = nn.L1Loss()
@@ -36,24 +37,28 @@ test_w  = w[train_size:,:,:]
 print(f"Splitting {b} training images into {train_w.shape[0]} training and {test_w.shape[0]} testing.\n")
 
 
-
 # Define dataset and dataloader
 dataset    = TensorDataset(train_w)
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-dataset2 = TensorDataset(test_w)
+dataset2    = TensorDataset(test_w)
 dataloader2 = DataLoader(dataset2, batch_size=batch_size, shuffle=True)
+
+ut.enstrophy_statistics( w )
+
+
+
 
 
 ##############################
 # Define autoencoder
 ##############################
-lc = 2 #change to whatever you want
+lc = 5 #Number of latent images
 ch = 4
-enc_res = [64, 32, 16,  8] # encoder resolution sequence
-enc_c   = [ 2, ch, ch, ch] # output conv channels
-dec_res = [ 8, 16, 32, 64] # decoder resolution sequence
-dec_c   = [lc, ch, ch, ch] # output conv channels 
+enc_res = [ 64, 32, 16,  8,  4,  2 ] # encoder resolution sequence
+enc_c   = [  2, ch, ch, ch, ch, ch ] # output conv channels
+dec_res = [  2,  4,  8, 16, 32, 64 ] # decoder resolution sequence
+dec_c   = [ lc, ch, ch, ch, ch, ch ] # output conv channels 
 
 network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
 #network.load_state_dict(torch.load(f"models/model_16.pth"))

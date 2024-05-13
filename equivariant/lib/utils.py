@@ -3,7 +3,6 @@ import numpy as np
 from scipy.io import loadmat
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = "cpu"
 
 def load_vorticity_data():
     #General purpose function for loading vorticity training data
@@ -28,3 +27,14 @@ def reset_torch_seed( seed_value=142 ):
     torch.manual_seed(seed_value)
     torch.cuda.manual_seed_all(seed_value)
 
+def enstrophy_statistics( w ):
+    # I want to force the network to learn extreme events in addition to slowly evolving state.
+    # To accomplish this, I will create a histogram of enstrophy (mean vorticity squared)
+
+    #compute the mean of the entire dataset
+    enstrophy = torch.mean( w*w, dim=[1,2], keepdim=True )
+
+    #Compute a histogram manually
+    max_enst = torch.max( enstrophy )
+    min_enst = torch.min( enstrophy )
+    print( f"Enstrophy ranges from {min_enst} to {max_enst}" )

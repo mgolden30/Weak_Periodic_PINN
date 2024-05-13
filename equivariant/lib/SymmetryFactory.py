@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 
 
-device = "cuda"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class SymmetryFactory():
     '''
@@ -101,4 +102,38 @@ class SymmetryFactory():
         if needs_reshaping:
             tensor = torch.unflatten(tensor, 1, (c1,c2) )
         
+        return tensor
+    
+
+    def continuous_translation( self, tensor, pixel_x, pixel_y ):
+        '''
+        PURPOSE:
+        Do continuous translations 
+        
+        INPUT:
+        tensor  - assumed to be of size [b,n,n]
+        pixel_x - desired shift in x (single precision)
+        pixel_y - desired shift in y (single precision)
+        '''
+
+        n = tensor.shape[-1]
+        tensor = torch.fft.rfft2( tensor )
+
+        #create wavenumber vectors
+        kx = torch.arange(n)
+        kx[ kx > n/2 ] = kx[ kx > n/2 ] - n
+        ky = kx[ 0:(n/2+1) ]
+
+        kx = torch.unsqueeze(kx, 1) #[n, 1]
+        ky = torch.unsqueeze(ky, 0) #[1, n/2+1]
+        
+        #shift the Fourier coefficients
+        dx = pixel_x * 2*torch.pi / n
+        dy = pixel_y * 2*torch.pi / n
+
+        #shift by complex exponential
+        tensor = tensor * torch.complex( torch.cos(kx*dx), torch.sin(kx*dx) )
+        tensor = tensor * torch.complex( torch.cos(ky*dy), torch.sin(ky*dy) )
+
+        tensor = torch.fft.irfft2(tensor)
         return tensor

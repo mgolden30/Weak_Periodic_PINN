@@ -4,7 +4,8 @@ import torch.nn as nn
 #from lib.SymmetryFactory import SymmetryFactory
 from lib.equivariant_networks import EquivariantLayer
 
-device = "cuda"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class EquivariantAutoencoder(nn.Module):
     def __init__(self, latent_c, enc_res, dec_res, enc_c, dec_c ):
@@ -62,7 +63,7 @@ class EquivariantAutoencoder(nn.Module):
         #Project to final encoding. Since this is linear, the same function 
         #is applied to both
         input = self.project_channels( self.elin, input )
-        v     = self.project_channels( self.elin, v )
+        v     = self.project_channels( self.elin, v ) if v is not None else None
  
         #Return the nonlinear map and the action of the Jacobian on v
         return input, v
@@ -78,7 +79,7 @@ class EquivariantAutoencoder(nn.Module):
             input, v = self.dec[i].forward(input, v)
         
         input = self.project_channels( self.dlin, input )
-        v     = self.project_channels( self.dlin, v )
+        v     = self.project_channels( self.dlin, v ) if v is not None else None
         
         #Return the nonlinear map and the action of the Jacobian on v
         return input, v

@@ -9,7 +9,8 @@ import torch.nn as nn
 from lib.FourierNeuralOperator import FourierNeuralOperator
 from scipy.io import savemat
 
-device = "cuda"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 
 
@@ -149,12 +150,12 @@ class EquivariantLayer(nn.Module):
         #Since this is a linear operation, v just has the same operation applied
 
         f0 = f.clone()
-        v0 = v.clone()
+        v0 = v.clone() if v is not None else None
 
         f, f1 = self.FNO1.forward( f0, fourier_input=True, fourier_output=True )
-        v, v1 = self.FNO1.forward( v0, fourier_input=True, fourier_output=True ) if v is not None else None
+        v, v1 = self.FNO1.forward( v0, fourier_input=True, fourier_output=True ) if v is not None else (None, None)
         _, f2 = self.FNO2.forward( f0, fourier_input=True, fourier_output=True )
-        _, v2 = self.FNO2.forward( v0, fourier_input=True, fourier_output=True ) if v is not None else None
+        _, v2 = self.FNO2.forward( v0, fourier_input=True, fourier_output=True ) if v is not None else (None, None)
 
         #Apply Euler step of the Euler equations
         f3, v3 = self.euler_step( f1, f2, v1, v2 )
