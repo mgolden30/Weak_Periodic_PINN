@@ -105,15 +105,15 @@ class SymmetryFactory():
         return tensor
     
 
-    def continuous_translation( self, tensor, pixel_x, pixel_y ):
+    def continuous_translation( self, tensor, dx, dy ):
         '''
         PURPOSE:
         Do continuous translations 
         
         INPUT:
         tensor  - assumed to be of size [b,n,n]
-        pixel_x - desired shift in x (single precision)
-        pixel_y - desired shift in y (single precision)
+        dx - desired shift in x (single precision)
+        dy - desired shift in y (single precision)
         '''
 
         n = tensor.shape[-1]
@@ -121,15 +121,18 @@ class SymmetryFactory():
 
         #create wavenumber vectors
         kx = torch.arange(n)
-        kx[ kx > n/2 ] = kx[ kx > n/2 ] - n
-        ky = kx[ 0:(n/2+1) ]
+        kx[ kx > n//2 ] = kx[ kx > n//2 ] - n
+        kx = kx.to(device)
+
+        ky = kx[ 0:(n//2+1) ]
 
         kx = torch.unsqueeze(kx, 1) #[n, 1]
         ky = torch.unsqueeze(ky, 0) #[1, n/2+1]
-        
-        #shift the Fourier coefficients
-        dx = pixel_x * 2*torch.pi / n
-        dy = pixel_y * 2*torch.pi / n
+
+        kx = torch.unsqueeze(kx,0)
+        kx = torch.unsqueeze(kx,0)
+        ky = torch.unsqueeze(ky,0)
+        ky = torch.unsqueeze(ky,0)
 
         #shift by complex exponential
         tensor = tensor * torch.complex( torch.cos(kx*dx), torch.sin(kx*dx) )

@@ -93,6 +93,9 @@ def time_deriv( w, nu, forcing, geometric=False ):
     wx  = torch.real(torch.fft.ifft2( 1j*kx*wf ))
     wy  = torch.real(torch.fft.ifft2( 1j*ky*wf ))
     lap = torch.real(torch.fft.ifft2( -(kx*kx + ky*ky)*wf ))
+    
+    #print(f"w -> {w.shape}")
+    #print(f"forcing -> {forcing.shape}")
 
     rhs = -(u*wx + v*wy) + nu*lap + forcing 
     rhs = dealias(rhs)

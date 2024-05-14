@@ -56,11 +56,15 @@ class FourierNeuralOperator(nn.Module):
         self.nyquist_neg = (k==-n_min/2)
         self.mask[ self.nyquist_neg ] = False #Make sure there is only one nyquist frequency
         
+        self.mask3 = (torch.abs(k) >= n_min/4)
+        self.mask4 = self.mask3[0:(n_max//2+1)]
 
         #move all constant tensors onto gpu
         #device = "cuda"
         self.mask     = self.mask.to(device)
         self.mask2    = self.mask2.to(device)
+        self.mask3    = self.mask3.to(device)
+        self.mask4    = self.mask4.to(device)
 
 
     def symmetric_kernel(self):
@@ -100,6 +104,10 @@ class FourierNeuralOperator(nn.Module):
         f[:,:,self.nyquist_pos,:]  = 0 * f[:,:,self.nyquist_pos,:]
         f[:,:,:,self.nyquist_pos2] = 0 * f[:,:,:,self.nyquist_pos2]
         
+        #Throw out high modes for advection to maintain 
+        f[:,:,self.mask3,:] = 0.0
+        f[:,:,:,self.mask4] = 0.0
+
         #Torch wants me to do the logical indexing one axis at a time
         f = f[:,:,self.mask ,         :]
         f = f[:,:,         :,self.mask2]

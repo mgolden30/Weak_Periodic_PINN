@@ -159,6 +159,9 @@ class EquivariantLayer(nn.Module):
 
         #Apply Euler step of the Euler equations
         f3, v3 = self.euler_step( f1, f2, v1, v2 )
+        #f3 = torch.fft.irfft2( f1 )
+        #v3 = torch.fft.irfft2( v1 ) if v is not None else None
+        
         #These come out in real space
 
         #Map original inputs back to real space. Resolution might have changed!
@@ -183,70 +186,3 @@ class EquivariantLayer(nn.Module):
     def save_kern(self, n):
         my_dict = { "k" : self.symmetric_kernel().cpu().detach() }
         savemat(f"kernel_{n}.mat", my_dict)
-
-
-
-
-
-
-    '''
-    DEPRECATED: old functions below. User beware...
-    '''
-
-    def genetic_activation(self,f):
-        '''
-        Use a physics-informed activation
-        '''
-        #f = torch.fft.rfft2(f)
-        u = torch.fft.irfft2( f*self.to_u ) #x component of velocity
-        v = torch.fft.irfft2( f*self.to_v ) #y component of velocity
-
-        #both components are of size [b,c2,n,n]
-        u = torch.unsqueeze(u, dim=1)
-        v = torch.unsqueeze(v, dim=2)
-        w = u*v
-        w = w - torch.transpose(w, 1, 2)
-        w = w.flatten(1,2) #combine these two dimensions
-        
-        #compute a mask to take the unique
-        k = torch.arange(self.c2)
-        d = torch.unsqueeze(k,dim=0) - torch.unsqueeze(k,dim=1)
-        d = d.flatten()
-        d = d>0
-        #print(w.shape)
-        w = w[:,d,:,:]
-        #print(w.shape)
-        return w
-    
-    def burgers_activation(self,f):
-        '''
-        Filling out the Fourier-spectrum is hard when upsampling and activating. What if we used a cheap
-        exact solution to the scalar Burgers equation
-
-        \partial_t \phi + \nabla \phi \cdot \nabla \phi = \nu \nabla^2 \phi
-        '''
-        f    = torch.fft.rfft2(f)
-        u = self.to_u * f 
-        v = self.to_v * f
-        
-        u = torch.fft.irfft2(u)
-        v = torch.fft.irfft2(v)
-        f = torch.fft.irfft2(f)
-        
-        #Generate an initial scalar field, no need to use a bias. 
-        phi = self.c_wsq*f*f + self.c_usq*(u*u+v*v) - self.bias
-        
-        #Do Cole-hopf transformation
-        nu = 1
-        phi = torch.exp( -phi/2/nu )
-
-        #Solve the heat equation forward in time
-        t = 1 #time to integrate
-        phi = torch.fft.rfft2(phi)
-        phi = torch.exp( -t*nu*(self.kx**2 + self.ky**2) )*phi
-        phi = torch.fft.irfft2(phi)
-
-        #Invert cole-hopf
-        phi = -2*nu*torch.log(phi)
-
-        return f

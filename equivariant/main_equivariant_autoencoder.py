@@ -29,6 +29,7 @@ ut.reset_torch_seed( seed_value=seed )
 #Load training data
 x, y, w = ut.load_vorticity_data()
 
+
 #split data into training and testing
 b = w.shape[0]
 train_size = round(b*0.8) #Do 80-20 split
@@ -55,10 +56,10 @@ ut.enstrophy_statistics( w )
 ##############################
 lc = 5 #Number of latent images
 ch = 4
-enc_res = [ 64, 32, 16,  8,  4,  2 ] # encoder resolution sequence
-enc_c   = [  2, ch, ch, ch, ch, ch ] # output conv channels
-dec_res = [  2,  4,  8, 16, 32, 64 ] # decoder resolution sequence
-dec_c   = [ lc, ch, ch, ch, ch, ch ] # output conv channels 
+enc_res = [ 64, 32, 16,  8,  4 ] # encoder resolution sequence
+enc_c   = [  2, ch, ch, ch, ch ] # output conv channels
+dec_res = [  4,  8, 16, 32, 64 ] # decoder resolution sequence
+dec_c   = [ lc, ch, ch, ch, ch ] # output conv channels 
 
 network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
 #network.load_state_dict(torch.load(f"models/model_16.pth"))
