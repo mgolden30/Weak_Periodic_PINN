@@ -12,8 +12,6 @@ from scipy.io import savemat
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-
-
 class EquivariantLayer(nn.Module):
     def __init__(self, c1, c2, n1, n2 ):
         '''

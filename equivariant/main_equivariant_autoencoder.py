@@ -54,12 +54,12 @@ ut.enstrophy_statistics( w )
 ##############################
 # Define autoencoder
 ##############################
-lc = 5 #Number of latent images
-ch = 4
-enc_res = [ 64, 32, 16,  8,  4 ] # encoder resolution sequence
-enc_c   = [  2, ch, ch, ch, ch ] # output conv channels
-dec_res = [  4,  8, 16, 32, 64 ] # decoder resolution sequence
-dec_c   = [ lc, ch, ch, ch, ch ] # output conv channels 
+lc = 2 #Number of latent images
+ch = 8
+enc_res = [ 64, 32, 16,  8 ] # encoder resolution sequence
+enc_c   = [  2, ch, ch, ch ] # output conv channels
+dec_res = [  8, 16, 32, 64 ] # decoder resolution sequence
+dec_c   = [ lc, ch, ch, ch ] # output conv channels 
 
 network = EquivariantAutoencoder( lc, enc_res, dec_res, enc_c, dec_c )
 #network.load_state_dict(torch.load(f"models/model_16.pth"))
